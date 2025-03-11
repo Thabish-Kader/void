@@ -47,3 +47,14 @@ SNS / WebSocket Notifications → Notify users when files are ready for download
 ### Challenges
 
 1. Bulk Upload
+
+### Todo
+
+- [ ] Configure Aws for DynamoDB, S3 Glacier
+- [ ] Service for DynamoDb
+- [ ] Service for S3 and Glacier
+- [ ] Upload pic/video to s3
+- [ ] Download pic/video from s3
+- [ ] Frontend UI
+- [ ] Bulk Upload
+- [ ] Auth
