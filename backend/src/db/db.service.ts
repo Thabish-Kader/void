@@ -1,17 +1,25 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getEnv } from 'src/utils';
 
 @Injectable()
 export class DbService {
   private readonly client: DynamoDBClient;
+  private readonly region: string;
+  private readonly accessKeyId: string;
+  private readonly secretAccessKey: string;
 
-  constructor(configService: ConfigService) {
+  constructor(private readonly configService: ConfigService) {
+    this.region = getEnv(this.configService, 'AWS_REGION');
+    this.accessKeyId = getEnv(this.configService, 'AWS_ACCESS_KEY_ID');
+    this.secretAccessKey = getEnv(this.configService, 'AWS_SECRET_ACCESS_KEY');
+
     this.client = new DynamoDBClient({
-      region: configService.get('AWS_REGION'),
+      region: this.region,
       credentials: {
-        accessKeyId: configService.get('AWS_ACCESS_KEY_ID') as string,
-        secretAccessKey: configService.get('AWS_SECRET_ACCESS_KEY') as string,
+        accessKeyId: this.accessKeyId,
+        secretAccessKey: this.secretAccessKey,
       },
     });
   }

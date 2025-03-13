@@ -1,7 +1,7 @@
 import { DynamoDBClient, ScanCommand } from '@aws-sdk/client-dynamodb';
 import { Injectable } from '@nestjs/common';
 import { DbService } from 'src/db/db.service';
-// import { UserDto } from './dto';
+import { User } from './entities';
 
 @Injectable()
 export class UsersRepository {
@@ -13,7 +13,7 @@ export class UsersRepository {
   }
 
   async findAll() {
-    let result: any = [];
+    const result: User[] = [];
 
     const command = new ScanCommand({
       TableName: this.tablename,
@@ -22,9 +22,11 @@ export class UsersRepository {
     const response = await this.client.send(command);
 
     if (response.Items) {
-      result = response.Items;
+      response.Items.forEach((item) => {
+        result.push(User.parseUser(item));
+      });
     }
-    console.log(result);
+
     return result;
   }
 }
