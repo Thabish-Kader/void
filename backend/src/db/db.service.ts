@@ -12,7 +12,7 @@ export class DbService {
 
   constructor(private readonly configService: ConfigService) {
     this.region = getEnv(this.configService, 'AWS_REGION');
-    this.accessKeyId = getEnv(this.configService, 'AWS_ACCESS_KEY_ID');
+    this.accessKeyId = getEnv(this.configService, 'AWS_SECRET_ACCESS_KEY');
     this.secretAccessKey = getEnv(this.configService, 'AWS_SECRET_ACCESS_KEY');
 
     this.client = new DynamoDBClient({

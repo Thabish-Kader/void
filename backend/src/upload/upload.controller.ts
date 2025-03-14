@@ -6,18 +6,30 @@ import {
   Patch,
   Param,
   Delete,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { UploadService } from './upload.service';
-import { CreateUploadDto } from './dto/create-upload.dto';
+// import { CreateUploadDto } from './dto/create-upload.dto';
 import { UpdateUploadDto } from './dto/update-upload.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { CreateUploadDto } from './dto';
 
 @Controller('upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
-  @Post()
-  create(@Body() createUploadDto: CreateUploadDto) {
-    return this.uploadService.create(createUploadDto);
+  @Post('single-file')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadSingleFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() createUploadDto: CreateUploadDto,
+  ) {
+    return this.uploadService.uploadSingleFile(
+      createUploadDto.userId,
+      file.originalname,
+      file.buffer,
+    );
   }
 
   @Get()
