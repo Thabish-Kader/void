@@ -1,11 +1,19 @@
-import { S3Client } from '@aws-sdk/client-s3';
+import {
+  CreateBucketCommandInput,
+  HeadBucketCommand,
+  HeadBucketCommandInput,
+  PutObjectCommand,
+  PutObjectCommandInput,
+  CreateBucketCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getEnv } from 'src/utils';
 
 @Injectable()
 export class S3Service {
-  private readonly s3Client: S3Client;
+  public readonly s3Client: S3Client;
 
   constructor(private readonly configService: ConfigService) {
     this.s3Client = new S3Client({
@@ -17,7 +25,15 @@ export class S3Service {
     });
   }
 
-  getS3Client(): S3Client {
-    return this.s3Client;
+  async putObjectCommand(params: PutObjectCommandInput) {
+    return this.s3Client.send(new PutObjectCommand(params));
+  }
+
+  async headBucketCommand(params: HeadBucketCommandInput) {
+    return this.s3Client.send(new HeadBucketCommand(params));
+  }
+
+  async createBucketCommand(params: CreateBucketCommandInput) {
+    return this.s3Client.send(new CreateBucketCommand(params));
   }
 }

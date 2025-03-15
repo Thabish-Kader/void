@@ -11,25 +11,34 @@ import {
 } from '@nestjs/common';
 import { UploadService } from './upload.service';
 // import { CreateUploadDto } from './dto/create-upload.dto';
-import { UpdateUploadDto } from './dto/update-upload.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { CreateUploadDto } from './dto';
+import { UploadFileDto } from './dto';
+import { Upload } from './entities';
 
 @Controller('upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
-  @Post('single-file')
+  // @Post('single-file')
+  // @UseInterceptors(FileInterceptor('file'))
+  // uploadSingleFile(
+  //   @UploadedFile() file: Express.Multer.File,
+  //   @Body() createUploadDto: CreateUploadDto,
+  // ) {
+  //   return this.uploadService.uploadSingleFile(
+  //     createUploadDto.userId,
+  //     file.originalname,
+  //     file.buffer,
+  //   );
+  // }
+  @Post('single-file/:userId')
   @UseInterceptors(FileInterceptor('file'))
-  uploadSingleFile(
+  async uploadSingleFile(
+    @Param('userId') userId: string,
+    @Body() fileDto: UploadFileDto,
     @UploadedFile() file: Express.Multer.File,
-    @Body() createUploadDto: CreateUploadDto,
-  ) {
-    return this.uploadService.uploadSingleFile(
-      createUploadDto.userId,
-      file.originalname,
-      file.buffer,
-    );
+  ): Promise<Upload> {
+    return this.uploadService.uploadSingleFile(userId, fileDto, file.buffer);
   }
 
   @Get()
@@ -40,11 +49,6 @@ export class UploadController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.uploadService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUploadDto: UpdateUploadDto) {
-    return this.uploadService.update(+id, updateUploadDto);
   }
 
   @Delete(':id')

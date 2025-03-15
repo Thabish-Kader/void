@@ -1,11 +1,15 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import {
+  DynamoDBClient,
+  PutItemCommand,
+  PutItemCommandInput,
+} from '@aws-sdk/client-dynamodb';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getEnv } from 'src/utils';
 
 @Injectable()
 export class DbService {
-  private readonly client: DynamoDBClient;
+  public readonly client: DynamoDBClient;
   private readonly region: string;
   private readonly accessKeyId: string;
   private readonly secretAccessKey: string;
@@ -26,5 +30,9 @@ export class DbService {
 
   getDynamoDBClient(): DynamoDBClient {
     return this.client;
+  }
+
+  async putItemCommand(params: PutItemCommandInput) {
+    return this.client.send(new PutItemCommand(params));
   }
 }
