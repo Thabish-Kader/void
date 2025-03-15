@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   UseInterceptors,
@@ -19,18 +18,6 @@ import { Upload } from './entities';
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
-  // @Post('single-file')
-  // @UseInterceptors(FileInterceptor('file'))
-  // uploadSingleFile(
-  //   @UploadedFile() file: Express.Multer.File,
-  //   @Body() createUploadDto: CreateUploadDto,
-  // ) {
-  //   return this.uploadService.uploadSingleFile(
-  //     createUploadDto.userId,
-  //     file.originalname,
-  //     file.buffer,
-  //   );
-  // }
   @Post('single-file/:userId')
   @UseInterceptors(FileInterceptor('file'))
   async uploadSingleFile(

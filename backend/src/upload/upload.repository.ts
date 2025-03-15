@@ -5,6 +5,7 @@ import { S3Service } from 'src/s3/s3.service';
 import { v4 as uuidv4 } from 'uuid';
 import { UploadFileDto } from './dto';
 import { Upload } from './entities';
+import { marshall } from '@aws-sdk/util-dynamodb';
 
 @Injectable()
 export class UploadRepository {
@@ -21,7 +22,7 @@ export class UploadRepository {
   ): Promise<Upload> {
     const bucketName = `user-${userId}`;
     const fileId = uuidv4();
-    const key = `${userId}/${fileId}/${fileDto.filename}`;
+    const key = `${fileId}/${fileDto.filename}`;
     const s3Url = `s3://${bucketName}/${key}`;
     const timestamp = new Date().toISOString();
 
@@ -32,6 +33,7 @@ export class UploadRepository {
         Key: key,
         Body: file,
       });
+      console.log('Item Created');
 
       const uploadItem: Upload = {
         userId,
@@ -43,17 +45,14 @@ export class UploadRepository {
         fileType: fileDto.fileType,
       };
 
-      // const marshalledItem = marshall(uploadItem);
+      const marshalledItem = marshall(uploadItem);
 
       await this.dbService.putItemCommand({
         TableName: this.fileTable,
-        Item: {
-          userId: { S: userId },
-          key: { S: key },
-          s3Url: { S: s3Url },
-          timestamp: { S: timestamp },
-        },
+        Item: marshalledItem,
       });
+
+      console.log('Item Uploaded to Dynamo');
 
       return uploadItem;
     } catch (error) {
@@ -65,12 +64,14 @@ export class UploadRepository {
   async bucketExists(bucketName: string) {
     try {
       await this.s3Service.headBucketCommand({ Bucket: bucketName });
+      console.log('Bucket Found');
     } catch (error: unknown) {
       if (
         error instanceof S3ServiceException &&
         error.$metadata.httpStatusCode === 404
       ) {
         await this.s3Service.createBucketCommand({ Bucket: bucketName });
+        console.log('Bucket Created');
       } else {
         throw error;
       }
