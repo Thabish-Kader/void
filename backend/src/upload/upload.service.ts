@@ -15,15 +15,11 @@ export class UploadService {
     return this.uploadRepository.uploadSingleFile(userId, fileDto, file);
   }
 
-  findAll() {
-    return `This action returns all upload`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} upload`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} upload`;
+  async uploadMultipleFiles(
+    userId: string,
+    fileDto: UploadFileDto,
+    files: Express.Multer.File[],
+  ): Promise<Upload[]> {
+    return this.uploadRepository.uploadMultipleFiles(userId, fileDto, files);
   }
 }

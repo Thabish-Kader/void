@@ -61,6 +61,60 @@ export class UploadRepository {
     }
   }
 
+  async uploadMultipleFiles(
+    userId: string,
+    fileDto: UploadFileDto,
+    files: Express.Multer.File[],
+  ): Promise<Upload[]> {
+    const bucketName = `user-${userId}`;
+    const timestamp = new Date().toISOString();
+
+    await this.bucketExists(bucketName);
+
+    const uploadPromises = files.map(async (file, i) => {
+      console.log(`${i} -> Uploading file ${file.originalname}`);
+      const fileId = uuidv4();
+      const key = `${fileId}/${file.originalname}`;
+      const s3Url = `s3://${bucketName}/${key}`;
+
+      try {
+        await this.s3Service.putObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+          Body: file.buffer,
+        });
+
+        console.log(`File ${file.originalname} uploaded to S3`);
+
+        const uploadItem: Upload = {
+          userId,
+          fileId,
+          key,
+          s3Url,
+          storageClass: 'GLACIER',
+          uploadTimestamp: timestamp,
+          fileType: fileDto.fileType,
+        };
+
+        const marshalledItem = marshall(uploadItem);
+
+        await this.dbService.putItemCommand({
+          TableName: this.fileTable,
+          Item: marshalledItem,
+        });
+
+        console.log(`File ${file.originalname} metadata saved to DynamoDB`);
+
+        return uploadItem;
+      } catch (error) {
+        console.error(`Error uploading file ${file.originalname}`, error);
+        throw error;
+      }
+    });
+
+    return Promise.all(uploadPromises);
+  }
+
   async bucketExists(bucketName: string) {
     try {
       await this.s3Service.headBucketCommand({ Bucket: bucketName });
