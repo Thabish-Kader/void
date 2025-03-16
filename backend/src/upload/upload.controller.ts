@@ -1,17 +1,16 @@
 import {
   Controller,
-  Get,
   Post,
   Body,
   Param,
-  Delete,
   UseInterceptors,
   UploadedFile,
+  UploadedFiles,
+  BadRequestException,
 } from '@nestjs/common';
 import { UploadService } from './upload.service';
-// import { CreateUploadDto } from './dto/create-upload.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { UploadFileDto } from './dto';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { UploadFileDto, UploadResponseDto } from './dto';
 import { Upload } from './entities';
 
 @Controller('upload')
@@ -25,21 +24,22 @@ export class UploadController {
     @Body() fileDto: UploadFileDto,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<Upload> {
+    if (!file) {
+      throw new BadRequestException('At least one file is required.');
+    }
     return this.uploadService.uploadSingleFile(userId, fileDto, file.buffer);
   }
 
-  @Get()
-  findAll() {
-    return this.uploadService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.uploadService.findOne(+id);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.uploadService.remove(+id);
+  @Post('multiples-files/:userId')
+  @UseInterceptors(FilesInterceptor('files'))
+  async uploadMultipleFiles(
+    @Param('userId') userId: string,
+    @Body() fileDto: UploadFileDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ): Promise<UploadResponseDto> {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('At least one file is required.');
+    }
+    return this.uploadService.uploadMultipleFiles(userId, fileDto, files);
   }
 }
