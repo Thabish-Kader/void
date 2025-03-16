@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { UploadRepository } from './upload.repository';
-import { UploadFileDto } from './dto';
+import { UploadFileDto, UploadResponseDto } from './dto';
 import { Upload } from './entities';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class UploadService {
     userId: string,
     fileDto: UploadFileDto,
     files: Express.Multer.File[],
-  ): Promise<Upload[]> {
+  ): Promise<UploadResponseDto> {
     return this.uploadRepository.uploadMultipleFiles(userId, fileDto, files);
   }
 }

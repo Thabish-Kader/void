@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { UploadService } from './upload.service';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { UploadFileDto } from './dto';
+import { UploadFileDto, UploadResponseDto } from './dto';
 import { Upload } from './entities';
 
 @Controller('upload')
@@ -36,11 +36,10 @@ export class UploadController {
     @Param('userId') userId: string,
     @Body() fileDto: UploadFileDto,
     @UploadedFiles() files: Express.Multer.File[],
-  ): Promise<Upload[]> {
+  ): Promise<UploadResponseDto> {
     if (!files || files.length === 0) {
       throw new BadRequestException('At least one file is required.');
     }
-    console.log(files);
     return this.uploadService.uploadMultipleFiles(userId, fileDto, files);
   }
 }

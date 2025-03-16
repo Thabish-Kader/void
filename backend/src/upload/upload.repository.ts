@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { DbService } from 'src/db/db.service';
 import { S3Service } from 'src/s3/s3.service';
 import { v4 as uuidv4 } from 'uuid';
-import { UploadFileDto } from './dto';
+import { UploadFileDto, UploadResponseDto } from './dto';
 import { Upload } from './entities';
 import { marshall } from '@aws-sdk/util-dynamodb';
 
@@ -22,7 +22,7 @@ export class UploadRepository {
   ): Promise<Upload> {
     const bucketName = `user-${userId}`;
     const fileId = uuidv4();
-    const key = `${fileId}/${fileDto.filename}`;
+    const key = `${fileDto.filename}`;
     const s3Url = `s3://${bucketName}/${key}`;
     const timestamp = new Date().toISOString();
 
@@ -65,7 +65,7 @@ export class UploadRepository {
     userId: string,
     fileDto: UploadFileDto,
     files: Express.Multer.File[],
-  ): Promise<Upload[]> {
+  ): Promise<UploadResponseDto> {
     const bucketName = `user-${userId}`;
     const timestamp = new Date().toISOString();
 
@@ -74,7 +74,7 @@ export class UploadRepository {
     const uploadPromises = files.map(async (file, i) => {
       console.log(`${i} -> Uploading file ${file.originalname}`);
       const fileId = uuidv4();
-      const key = `${fileId}/${file.originalname}`;
+      const key = `${file.originalname}`;
       const s3Url = `s3://${bucketName}/${key}`;
 
       try {
@@ -104,15 +104,29 @@ export class UploadRepository {
         });
 
         console.log(`File ${file.originalname} metadata saved to DynamoDB`);
+        const {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          userId: _ommitUserId,
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          fileId: _ommitFileId,
+          ...responseFile
+        } = uploadItem;
 
-        return uploadItem;
+        return responseFile;
       } catch (error) {
         console.error(`Error uploading file ${file.originalname}`, error);
         throw error;
       }
     });
 
-    return Promise.all(uploadPromises);
+    const responseFiles = await Promise.all(uploadPromises);
+
+    const response: UploadResponseDto = {
+      message: `Files ${responseFiles.length} uploaded successfully`,
+      files: responseFiles,
+    };
+
+    return response;
   }
 
   async bucketExists(bucketName: string) {
