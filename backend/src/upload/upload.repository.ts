@@ -1,9 +1,9 @@
-import { S3ServiceException } from '@aws-sdk/client-s3';
+import { S3ServiceException, StorageClass } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { DbService } from 'src/db/db.service';
 import { S3Service } from 'src/s3/s3.service';
 import { v4 as uuidv4 } from 'uuid';
-import { UploadFileDto, UploadResponseDto } from './dto';
+import { UploadResponseDto } from './dto';
 import { Upload } from './entities';
 import { marshall } from '@aws-sdk/util-dynamodb';
 
@@ -15,55 +15,8 @@ export class UploadRepository {
     private readonly s3Service: S3Service,
   ) {}
 
-  async uploadSingleFile(
+  async uploadFiles(
     userId: string,
-    fileDto: UploadFileDto,
-    file: Buffer,
-  ): Promise<Upload> {
-    const bucketName = `user-${userId}`;
-    const fileId = uuidv4();
-    const key = `${fileDto.filename}`;
-    const s3Url = `s3://${bucketName}/${key}`;
-    const timestamp = new Date().toISOString();
-
-    try {
-      await this.bucketExists(bucketName);
-      await this.s3Service.putObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-        Body: file,
-      });
-      console.log('Item Created');
-
-      const uploadItem: Upload = {
-        userId,
-        fileId,
-        key,
-        s3Url,
-        storageClass: 'GLACIER',
-        uploadTimestamp: timestamp,
-        fileType: fileDto.fileType,
-      };
-
-      const marshalledItem = marshall(uploadItem);
-
-      await this.dbService.putItemCommand({
-        TableName: this.fileTable,
-        Item: marshalledItem,
-      });
-
-      console.log('Item Uploaded to Dynamo');
-
-      return uploadItem;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async uploadMultipleFiles(
-    userId: string,
-    fileDto: UploadFileDto,
     files: Express.Multer.File[],
   ): Promise<UploadResponseDto> {
     const bucketName = `user-${userId}`;
@@ -76,14 +29,38 @@ export class UploadRepository {
       const fileId = uuidv4();
       const key = `${file.originalname}`;
       const s3Url = `s3://${bucketName}/${key}`;
+      const fileSizeMB = file.size / (1024 * 1024);
+
+      let fileType: string;
+
+      const mimeType = file.mimetype;
+
+      if (mimeType.startsWith('image/')) {
+        fileType = 'image';
+      } else if (mimeType.startsWith('video/')) {
+        fileType = 'video';
+      } else {
+        fileType = 'unknown';
+      }
 
       try {
-        await this.s3Service.putObjectCommand({
-          Bucket: bucketName,
-          Key: key,
-          Body: file.buffer,
-        });
-
+        if (fileSizeMB > 20) {
+          console.log(
+            `File ${file.originalname} is large (${fileSizeMB} MB). Using Multipart Upload.`,
+          );
+          await this.s3Service.uploadLargeFile(
+            bucketName,
+            key,
+            file.buffer,
+            StorageClass.STANDARD,
+          );
+        } else {
+          await this.s3Service.putObjectCommand({
+            Bucket: bucketName,
+            Key: key,
+            Body: file.buffer,
+          });
+        }
         console.log(`File ${file.originalname} uploaded to S3`);
 
         const uploadItem: Upload = {
@@ -91,9 +68,9 @@ export class UploadRepository {
           fileId,
           key,
           s3Url,
-          storageClass: 'GLACIER',
+          storageClass: StorageClass.STANDARD,
           uploadTimestamp: timestamp,
-          fileType: fileDto.fileType,
+          fileType,
         };
 
         const marshalledItem = marshall(uploadItem);
@@ -122,7 +99,7 @@ export class UploadRepository {
     const responseFiles = await Promise.all(uploadPromises);
 
     const response: UploadResponseDto = {
-      message: `Files ${responseFiles.length} uploaded successfully`,
+      message: `${responseFiles.length} files uploaded successfully`,
       files: responseFiles,
     };
 
