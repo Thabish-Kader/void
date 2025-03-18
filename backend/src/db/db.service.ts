@@ -2,6 +2,8 @@ import {
   DynamoDBClient,
   PutItemCommand,
   PutItemCommandInput,
+  QueryCommand,
+  QueryCommandInput,
 } from '@aws-sdk/client-dynamodb';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -34,5 +36,9 @@ export class DbService {
 
   async putItemCommand(params: PutItemCommandInput) {
     return this.client.send(new PutItemCommand(params));
+  }
+
+  async queryCommand(params: QueryCommandInput) {
+    return this.client.send(new QueryCommand(params));
   }
 }

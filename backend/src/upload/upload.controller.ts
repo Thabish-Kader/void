@@ -5,6 +5,7 @@ import {
   UseInterceptors,
   UploadedFiles,
   BadRequestException,
+  Get,
 } from '@nestjs/common';
 import { UploadService } from './upload.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
@@ -24,5 +25,10 @@ export class UploadController {
       throw new BadRequestException('At least one file is required.');
     }
     return this.uploadService.uploadFiles(userId, files);
+  }
+
+  @Get('get-files/:userId')
+  async getFiles(@Param('userId') userId: string) {
+    return this.uploadService.getFiles(userId);
   }
 }
