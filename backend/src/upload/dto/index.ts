@@ -1,1 +1,0 @@
-export * from './uploadFile.dto';

@@ -10,11 +10,3 @@ export class UploadResponseDto {
   message: string;
   files: Omit<UserFilesEntity, 'userId' | 'fileId'>[];
 }
-
-export class UserFileResponseDto {
-  uploadedAt: string;
-  storageClass: string;
-  fileType: string;
-  fileId: string;
-  signedUrl: string;
-}

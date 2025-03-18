@@ -4,11 +4,12 @@ import { DbService } from 'src/db/db.service';
 import { S3Service } from 'src/s3/s3.service';
 import { v4 as uuidv4 } from 'uuid';
 import { UploadResponseDto, UserFileResponseDto } from './dto';
-import { UserFilesEntity } from './entities';
+
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import { UserFilesEntity } from './entities';
 
 @Injectable()
-export class UploadRepository {
+export class MediaRepository {
   private readonly fileTable = 'UserFiles';
   constructor(
     private readonly dbService: DbService,

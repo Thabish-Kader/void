@@ -1,21 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { UploadRepository } from './upload.repository';
+import { MediaRepository } from './media.repository';
 import { UploadResponseDto, UserFileResponseDto } from './dto';
 
 @Injectable()
-export class UploadService {
-  constructor(private readonly uploadRepository: UploadRepository) {}
+export class MediaService {
+  constructor(private readonly mediaRepository: MediaRepository) {}
 
   async uploadFiles(
     userId: string,
     files: Express.Multer.File[],
   ): Promise<UploadResponseDto> {
-    const response = await this.uploadRepository.uploadFiles(userId, files);
+    const response = await this.mediaRepository.uploadFiles(userId, files);
     return response;
   }
 
   async getFiles(userId: string): Promise<UserFileResponseDto[]> {
-    const response = await this.uploadRepository.getFiles(userId);
+    const response = await this.mediaRepository.getFiles(userId);
     return response;
   }
 }
