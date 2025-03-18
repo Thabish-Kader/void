@@ -5,14 +5,15 @@ import {
   UseInterceptors,
   UploadedFiles,
   BadRequestException,
+  Get,
 } from '@nestjs/common';
-import { UploadService } from './upload.service';
+import { MediaService } from './media.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { UploadResponseDto } from './dto';
 
 @Controller('upload')
-export class UploadController {
-  constructor(private readonly uploadService: UploadService) {}
+export class MediaController {
+  constructor(private readonly mediaService: MediaService) {}
 
   @Post('upload-files/:userId')
   @UseInterceptors(FilesInterceptor('files'))
@@ -23,6 +24,11 @@ export class UploadController {
     if (!files || files.length === 0) {
       throw new BadRequestException('At least one file is required.');
     }
-    return this.uploadService.uploadFiles(userId, files);
+    return this.mediaService.uploadFiles(userId, files);
+  }
+
+  @Get('get-files/:userId')
+  async getFiles(@Param('userId') userId: string) {
+    return this.mediaService.getFiles(userId);
   }
 }

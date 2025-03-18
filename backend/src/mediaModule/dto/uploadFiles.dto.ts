@@ -1,5 +1,5 @@
 import { IsString } from 'class-validator';
-import { Upload } from '../entities';
+import { UserFilesEntity } from '../entities';
 
 export class UploadFileDto {
   @IsString()
@@ -8,5 +8,5 @@ export class UploadFileDto {
 
 export class UploadResponseDto {
   message: string;
-  files: Omit<Upload, 'userId' | 'fileId'>[];
+  files: Omit<UserFilesEntity, 'userId' | 'fileId'>[];
 }

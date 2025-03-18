@@ -5,7 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DbModule } from './db/db.module';
 import { UsersModule } from './users/users.module';
 import { S3Module } from './s3/s3.module';
-import { UploadModule } from './upload/upload.module';
+import { UploadModule } from './mediaModule/media.module';
 
 @Module({
   imports: [

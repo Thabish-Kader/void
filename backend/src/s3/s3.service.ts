@@ -10,7 +10,9 @@ import {
   CreateMultipartUploadCommand,
   UploadPartCommand,
   CompleteMultipartUploadCommand,
+  GetObjectCommand,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getEnv } from 'src/utils';
@@ -102,5 +104,24 @@ export class S3Service {
     console.log(`Sending Multipart Upload for ${key}`);
     await this.s3Client.send(completeUploadCommand);
     console.log(`Multipart Upload Complete for ${key}`);
+  }
+
+  async generateSignedUrls<T extends { bucketName: string; key: string }>(
+    data: T[],
+  ): Promise<(T & { signedUrl: string })[]> {
+    const signedUrlPromises = data.map(async (item) => {
+      const signedUrl = await getSignedUrl(
+        this.s3Client,
+        new GetObjectCommand({
+          Bucket: item.bucketName,
+          Key: item.key,
+        }),
+        { expiresIn: 3600 },
+      );
+
+      return { ...item, signedUrl };
+    });
+
+    return Promise.all(signedUrlPromises);
   }
 }
