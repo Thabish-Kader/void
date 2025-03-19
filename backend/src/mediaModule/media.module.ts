@@ -7,4 +7,4 @@ import { MediaRepository } from './media.repository';
   controllers: [MediaController],
   providers: [MediaService, MediaRepository],
 })
-export class UploadModule {}
+export class MediaModule {}

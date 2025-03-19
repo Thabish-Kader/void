@@ -5,3 +5,7 @@ export class UserFileResponseDto {
   fileId: string;
   signedUrl: string;
 }
+
+export class ArchivedFilesResponseDto extends UserFileResponseDto {
+  restoreStatus?: string;
+}
