@@ -1,9 +1,14 @@
-import { S3ServiceException, StorageClass } from '@aws-sdk/client-s3';
+import { S3ServiceException } from '@aws-sdk/client-s3';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DbService } from 'src/db/db.service';
 import { S3Service } from 'src/s3/s3.service';
 import { v4 as uuidv4 } from 'uuid';
-import { UploadResponseDto, UserFileResponseDto } from './dto';
+import {
+  ArchivedFilesResponseDto,
+  UploadRequestDto,
+  UploadResponseDto,
+  UserFileResponseDto,
+} from './dto';
 
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import { UserFilesEntity } from './entities';
@@ -19,6 +24,7 @@ export class MediaRepository {
   async uploadFiles(
     userId: string,
     files: Express.Multer.File[],
+    body: UploadRequestDto,
   ): Promise<UploadResponseDto> {
     const bucketName = `user-${userId}`;
     const timestamp = new Date().toISOString();
@@ -45,6 +51,8 @@ export class MediaRepository {
       }
 
       try {
+        const storageClass = body.storageClass;
+        console.log(`Uploading to s3 ${storageClass}`);
         if (fileSizeMB > 20) {
           console.log(
             `File ${file.originalname} is large (${fileSizeMB} MB). Using Multipart Upload.`,
@@ -53,13 +61,14 @@ export class MediaRepository {
             bucketName,
             key,
             file.buffer,
-            StorageClass.STANDARD,
+            storageClass,
           );
         } else {
           await this.s3Service.putObjectCommand({
             Bucket: bucketName,
             Key: key,
             Body: file.buffer,
+            StorageClass: storageClass,
           });
         }
         console.log(`File ${file.originalname} uploaded to S3`);
@@ -70,7 +79,7 @@ export class MediaRepository {
           key,
           s3Url,
           bucketName,
-          storageClass: StorageClass.STANDARD,
+          storageClass: storageClass,
           uploadTimestamp: timestamp,
           fileType,
         };
@@ -136,6 +145,42 @@ export class MediaRepository {
         fileType: file.fileType,
         fileId: file.fileId,
         signedUrl: file.signedUrl,
+      };
+      return data;
+    });
+
+    return response;
+  }
+
+  async getArchivedFiles(userId: string): Promise<ArchivedFilesResponseDto[]> {
+    const queryCommand = {
+      TableName: this.fileTable,
+      KeyConditionExpression: 'userId = :userId',
+      ExpressionAttributeValues: {
+        ':userId': { S: userId },
+      },
+    };
+
+    const result = await this.dbService.queryCommand(queryCommand);
+
+    if (!result.Items || result.Items?.length === 0) {
+      throw new NotFoundException('User Not Found');
+    }
+    const users: UserFilesEntity[] = result.Items.map(
+      (item) => unmarshall(item) as UserFilesEntity,
+    );
+
+    const fileData =
+      await this.s3Service.bulkRetrieveFiles<UserFilesEntity>(users);
+
+    const response: ArchivedFilesResponseDto[] = fileData.map((file) => {
+      const data = {
+        uploadedAt: file.uploadTimestamp,
+        storageClass: file.storageClass,
+        fileType: file.fileType,
+        fileId: file.fileId,
+        signedUrl: file.signedUrl ?? '',
+        restorStatus: file.restoreStatus,
       };
       return data;
     });
