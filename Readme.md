@@ -89,3 +89,134 @@ SNS / WebSocket Notifications → Notify users when files are ready for download
 - [ ] Frontend UI
 - [ ] Bulk Upload
 - [ ] Auth
+
+# AWS Configuration Steps
+
+# 1. IAM - Provide access to DynamoDb and S3
+
+# 2. Create DynamoDB Tables & Create Bucket for S3
+
+# 3. SES
+
+## Verify an Email Address in Amazon SES
+
+### 1. Go to the SES Console:
+
+- Navigate to the [Amazon SES Console](https://console.aws.amazon.com/ses/).
+
+### 2. Verify Your Email Address:
+
+- In the left-hand menu, under **Identity Management**, select **Verified identities**.
+- Click **Verify a New Email Address**.
+- Enter the personal email address you want to use (e.g., `yourname@example.com`).
+- Click **Verify This Email Address**.
+- Note: In sanbox mode you need to have to verified email address for sender and reciever. If you go to production mode this is not necessary.
+
+### 3. Check Your Email Inbox:
+
+- SES will send a verification email to the address you provided.
+- Open the email and click on the verification link to confirm that you own the email address.
+- Once your email address is verified, you will be able to send emails from that address via SES.
+
+## Important Considerations:
+
+### Sandbox Mode:
+
+- If your SES account is in the sandbox environment, you'll only be able to send emails to verified email addresses.
+- Once you request production access, you'll be able to send emails to unverified addresses as well.
+
+### Production Access:
+
+- If you need to send emails to non-verified addresses, you’ll need to request production access.
+- This can be done in the SES Console under **Sending Statistics**.
+
+# 4. Lambda
+
+## Steps to Configure IAM Permissions for Lambda
+
+### 1. Create an IAM Role for Lambda (if not already created)
+
+If you don't already have a role for your Lambda, you'll need to create one:
+
+#### Go to the IAM Console:
+
+- Navigate to the [AWS IAM Console](https://console.aws.amazon.com/iam/).
+
+#### Create a New Role:
+
+- In the left sidebar, click on **Roles**.
+- Click **Create role**.
+
+#### Select Lambda as Trusted Entity:
+
+- In the **Select trusted entity** section, choose **Lambda**.
+- Click **Next: Permissions**.
+
+#### Attach Policies for SES Permissions:
+
+- On the **Attach permissions policies** screen, search for the **AmazonSESFullAccess** policy (or create a custom policy with the permissions we discussed earlier).
+- You can also add any other policies you might need for other AWS services (e.g., S3, SNS).
+- Click **Next: Tags**.
+
+#### Review and Create the Role:
+
+- Name the role (e.g., `LambdaSESRole`) and click **Create role**.
+
+### 2. Assign the IAM Role to Your Lambda Function
+
+Once your IAM role is created, you need to assign it to your Lambda function:
+
+#### Go to the Lambda Console:
+
+- Navigate to the [AWS Lambda Console](https://console.aws.amazon.com/lambda/).
+
+#### Create/Select Your Lambda Function:
+
+- Click on the name of the Lambda function you want to configure or Press Create Function.
+- Give name for Function
+- Toggle change default execution role
+- Select `Use an exisiting role`
+- Select `LambdaSESRole`
+- Create Function
+- In the editor under code paste the following
+
+## Code Example
+
+```javascript
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+
+// Initialize the SES client
+const sesClient = new SESClient({ region: "ap-south-1" });
+
+// Define email parameters
+const params = {
+  Destination: {
+    ToAddresses: ["recipient@example.com"], // Make sure to use a verified email address in sandbox mode
+  },
+  Message: {
+    Body: {
+      Text: {
+        Data: "Your file restoration is complete!",
+      },
+    },
+    Subject: {
+      Data: "S3 File Restoration Complete",
+    },
+  },
+  Source: "sender@example.com", // Replace with your verified email address
+};
+
+// Lambda handler function
+export const handler = async (event) => {
+  try {
+    const command = new SendEmailCommand(params);
+    await sesClient.send(command);
+    console.log("Email sent successfully!");
+  } catch (error) {
+    console.error("Error sending email:", error);
+  }
+};
+```
+
+- Deploy the Code & Test it out
+- Check the output in the editor for errors or for a success
