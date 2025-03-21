@@ -16,7 +16,7 @@ export class MediaService {
     files: Express.Multer.File[],
     body: UploadRequestDto,
   ): Promise<UploadResponseDto> {
-    const response = await this.mediaRepository.uploadFiles(
+    const response = await this.mediaRepository.uploadCompressedFilesv2(
       userId,
       files,
       body,
