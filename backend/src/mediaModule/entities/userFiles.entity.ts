@@ -9,4 +9,5 @@ export class UserFilesEntity {
   storageClass: StorageClass;
   uploadTimestamp: string;
   fileType: string;
+  email: string;
 }

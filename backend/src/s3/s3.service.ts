@@ -7,17 +7,18 @@ import {
   CreateBucketCommand,
   S3Client,
   StorageClass,
-  CreateMultipartUploadCommand,
-  UploadPartCommand,
-  CompleteMultipartUploadCommand,
   GetObjectCommand,
   HeadObjectCommand,
   RestoreObjectCommand,
 } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as archiver from 'archiver';
+
 import { getEnv } from 'src/utils';
+import { PassThrough } from 'stream';
 
 @Injectable()
 export class S3Service {
@@ -45,78 +46,70 @@ export class S3Service {
     return this.s3Client.send(new CreateBucketCommand(params));
   }
 
-  async uploadLargeFile(
+  async uploadCompressedFiles(
     bucketName: string,
-    key: string,
-    fileBuffer: Buffer,
+    fileKey: string,
+    files: Express.Multer.File[],
     storageClass: StorageClass,
   ) {
-    const PART_SIZE = 10 * 1024 * 1024; // 10MB per part
-    const totalParts = Math.ceil(fileBuffer.length / PART_SIZE);
-    console.log(`Starting Multipart Upload: ${totalParts} parts.`);
+    try {
+      const archiveStream = new PassThrough(); // Streaming ZIP archive
 
-    const createUploadCommand = new CreateMultipartUploadCommand({
-      Bucket: bucketName,
-      Key: key,
-      StorageClass: storageClass,
-    });
-
-    const { UploadId } = await this.s3Client.send(createUploadCommand);
-    if (!UploadId) throw new Error('Failed to create multipart upload');
-    let uploadedParts = 0;
-    const uploadPromises: Promise<{
-      PartNumber: number;
-      ETag: string | undefined;
-    }>[] = [];
-    for (let index = 0; index < totalParts; index++) {
-      const start = index * PART_SIZE;
-      const end = Math.min(start + PART_SIZE, fileBuffer.length);
-      const partBuffer = fileBuffer.slice(start, end);
-
-      const uploadPartCommand = new UploadPartCommand({
+      const s3UploadParams = {
         Bucket: bucketName,
-        Key: key,
-        PartNumber: index + 1,
-        UploadId,
-        Body: partBuffer,
+        Key: fileKey,
+        Body: archiveStream, // Streaming directly to S3
+        ContentType: 'application/zip',
+        StorageClass: storageClass,
+      };
+
+      const upload = new Upload({
+        client: this.s3Client,
+        params: s3UploadParams,
       });
 
-      const uploadPartPromise = this.s3Client
-        .send(uploadPartCommand)
-        .then((uploadPartResult) => {
-          uploadedParts++;
-          console.log(
-            `Uploaded part ${index + 1}/${totalParts} - ${((uploadedParts / totalParts) * 100).toFixed(2)}% complete`,
-          );
-          return { PartNumber: index + 1, ETag: uploadPartResult.ETag };
-        });
+      const archive = archiver('zip', { zlib: { level: 9 } });
 
-      uploadPromises.push(uploadPartPromise);
+      archive.pipe(archiveStream); // Ensure proper piping
+
+      let totalInputSize = 0;
+      for (const file of files) {
+        if (!file || !file.buffer || file.buffer.length === 0) {
+          console.error(`Skipping empty file: ${file.originalname}`);
+          continue;
+        }
+
+        console.log(
+          `Adding file: ${file.originalname}, Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        );
+        totalInputSize += file.size;
+        archive.append(file.buffer, { name: file.originalname });
+      }
+
+      console.log(
+        `Total input file size before compression: ${(totalInputSize / 1024 / 1024).toFixed(2)} MB`,
+      );
+
+      await archive.finalize(); // Ensure archive is properly finalized
+      console.log('Archive finalization complete');
+
+      await upload.done();
+      console.log(`Upload successful! File saved as ${fileKey}`);
+    } catch (error) {
+      console.error('Error uploading compressed files:', error);
+      throw error;
     }
-
-    const parts = await Promise.all(uploadPromises);
-    console.log(`Multipart Upload Complete for ${key}`);
-    // Complete Multipart Upload
-    const completeUploadCommand = new CompleteMultipartUploadCommand({
-      Bucket: bucketName,
-      Key: key,
-      UploadId,
-      MultipartUpload: { Parts: parts },
-    });
-    console.log(`Sending Multipart Upload for ${key}`);
-    await this.s3Client.send(completeUploadCommand);
-    console.log(`Multipart Upload Complete for ${key}`);
   }
 
-  async generateSignedUrls<T extends { bucketName: string; key: string }>(
-    data: T[],
-  ): Promise<(T & { signedUrl: string })[]> {
+  async generateSignedUrls<
+    T extends { bucketName: string; key: string; email: string },
+  >(data: T[]): Promise<(T & { signedUrl: string })[]> {
     const signedUrlPromises = data.map(async (item) => {
       const signedUrl = await getSignedUrl(
         this.s3Client,
         new GetObjectCommand({
           Bucket: item.bucketName,
-          Key: item.key,
+          Key: `${item.email}/${item.key}`,
         }),
         { expiresIn: 3600 },
       );
