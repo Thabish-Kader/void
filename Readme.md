@@ -154,7 +154,7 @@ If you don't already have a role for your Lambda, you'll need to create one:
 
 #### Attach Policies for SES Permissions:
 
-- On the **Attach permissions policies** screen, search for the **AmazonSESFullAccess** policy (or create a custom policy with the permissions we discussed earlier).
+- On the **Attach permissions policies** screen, search for the **AmazonSESFullAccess**,**AmazonS3ReadOnlyAccess**, **AWSLambdaBasicExecutionRole** policy (or create a custom policy with the permissions we discussed earlier).
 - You can also add any other policies you might need for other AWS services (e.g., S3, SNS).
 - Click **Next: Tags**.
 
@@ -220,3 +220,7 @@ export const handler = async (event) => {
 
 - Deploy the Code & Test it out
 - Check the output in the editor for errors or for a success
+
+### Resources
+
+- [Restoring an archived object](https://docs.aws.amazon.com/AmazonS3/latest/userguide/restoring-objects.html)
