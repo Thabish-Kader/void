@@ -68,8 +68,17 @@ export class S3Service {
         params: s3UploadParams,
       });
 
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      upload.on('httpUploadProgress', (progress) => {
+        const uploadedMB = progress.loaded
+          ? (progress.loaded / 1024 / 1024).toFixed(2)
+          : 'Error occured';
+        const totalMB = progress.total
+          ? (progress.total / 1024 / 1024).toFixed(2)
+          : 'Unknown';
+        console.log(`📤 Upload Progress: ${uploadedMB} MB / ${totalMB} MB`);
+      });
 
+      const archive = archiver('zip', { zlib: { level: 9 } });
       archive.pipe(archiveStream); // Ensure proper piping
 
       let totalInputSize = 0;
@@ -89,7 +98,6 @@ export class S3Service {
       console.log(
         `Total input file size before compression: ${(totalInputSize / 1024 / 1024).toFixed(2)} MB`,
       );
-
       await archive.finalize(); // Ensure archive is properly finalized
       console.log('Archive finalization complete');
 
