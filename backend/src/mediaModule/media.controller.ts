@@ -7,10 +7,12 @@ import {
   BadRequestException,
   Get,
   Body,
+  Query,
 } from '@nestjs/common';
 import { MediaService } from './media.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { UploadRequestDto, UploadResponseDto } from './dto';
+import { UserFilesEntity } from './entities';
 
 @Controller('upload')
 export class MediaController {
@@ -37,5 +39,18 @@ export class MediaController {
   @Get('get-archived-files/:userId')
   async getArchivedFiles(@Param('userId') userId: string) {
     return this.mediaService.getArchivedFiles(userId);
+  }
+
+  @Get('presigned-url')
+  async getPresignedUrl(@Query() query: UploadRequestDto) {
+    // const timestamp = new Date().toISOString();
+    const folderName = `${query.email}/`;
+    const fileKey = `${folderName}${query.fileName}`;
+    return this.mediaService.getPresignedUrl(fileKey, query.storageClass);
+  }
+
+  @Post('update-metadata')
+  async updateMetadata(@Body() body: UserFilesEntity) {
+    return await this.mediaService.updateMetadata(body);
   }
 }

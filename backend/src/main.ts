@@ -8,6 +8,11 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
   );
+  // TODO: Change * on prod
+  app.enableCors({
+    origin: process.env.NODE_ENV === 'dev' ? 'http://localhost:3000' : '*',
+  });
+
   app.useGlobalFilters(new GlobalExceptionFilter());
   console.log(
     `--------> FIRING UP IN ${process.env.NODE_ENV} : PORT ${process.env.PORT} <--------`,

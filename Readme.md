@@ -31,7 +31,7 @@ The following provides a cost breakdown for various cloud storage services based
 
 - **Retrieval/Transfer Costs**: These vary based on the amount of data retrieved and the region where the data is accessed. Be sure to check your usage and account for retrieval/transfer costs if you anticipate needing to access your data.
 
-### Steps to achive
+### Steps to achieve
 
 1. Upload files to Amazon S3 first, then use S3 Lifecycle Rules to transition them to Glacier for archival.
 2. Store metadata (URLs, retrieval status, and archive details) in DynamoDB for fast lookups.
@@ -53,48 +53,35 @@ Lambda Functions → Automate file archival & retrieval process.
 API Gateway → Users interact via a web or mobile app to upload & request retrievals.
 SNS / WebSocket Notifications → Notify users when files are ready for download.
 
-### Lifecycle Rule: Move Files to Glacier
-
-```json
-{
-  "Rules": [
-    {
-      "ID": "MoveToGlacier",
-      "Status": "Enabled",
-      "Filter": {},
-      "Transitions": [
-        {
-          "Days": 30,
-          "StorageClass": "GLACIER"
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Challenges
-
-1. Bulk Upload
-
-### Todo
-
-- [x] Configure Aws for DynamoDB, S3 Glacier
-- [x] Service for DynamoDb
-- [x] Service for S3
-- [ ] Upload pic/video to s3
-- [ ] Download pic/video from s3
-- [ ] Configure S3 Glacier
-- [ ] S3 Glacier Retrieval logic
-- [ ] Frontend UI
-- [ ] Bulk Upload
-- [ ] Auth
-
 # AWS Configuration Steps
 
 # 1. IAM - Provide access to DynamoDb and S3
 
 # 2. Create DynamoDB Tables & Create Bucket for S3
+
+### 1. After Creating Lambda Function details in step 4 configure events to send to lambda function
+
+- Navigate to properties
+- Go to Event notification
+- Check Restore completed
+- Under Destination select Lambda function
+- Under Specify Lambda function select Choose from your Lambda functions
+- In the dropdown select the lambda function created
+
+### 2. Enable Cors for S3
+
+Go to the bucket create -> navigate to permissions -> go to Cross-origin resource sharing (CORS) and paste the following for dev
+
+```json
+[
+  {
+    "AllowedHeaders": ["Content-Type", "Authorization", "x-amz-security-token"],
+    "AllowedMethods": ["PUT", "POST", "GET", "DELETE"],
+    "AllowedOrigins": ["http://localhost:3000"], // change to prod domain once live
+    "ExposeHeaders": []
+  }
+]
+```
 
 # 3. SES
 

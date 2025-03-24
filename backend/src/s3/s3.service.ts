@@ -109,6 +109,24 @@ export class S3Service {
     }
   }
 
+  async generateSignedUrlForUpload(
+    fileKey: string,
+    storageClass: StorageClass,
+  ) {
+    const bucketName = getEnv(this.configService, 'AWS_BUCKET_NAME');
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: fileKey,
+      StorageClass: storageClass,
+    });
+
+    const signedUrl = await getSignedUrl(this.s3Client, command, {
+      expiresIn: 3600,
+    });
+
+    return { signedUrl, fileKey };
+  }
+
   async generateSignedUrls<
     T extends { bucketName: string; key: string; email: string },
   >(data: T[]): Promise<(T & { signedUrl: string })[]> {

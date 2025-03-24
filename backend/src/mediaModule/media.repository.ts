@@ -160,4 +160,12 @@ export class MediaRepository {
       }
     }
   }
+
+  async updateMetadata(body: UserFilesEntity) {
+    const response = await this.dbService.putItemCommand({
+      TableName: this.fileTable,
+      Item: marshall(body),
+    });
+    return response;
+  }
 }
