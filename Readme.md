@@ -182,40 +182,102 @@ Once your IAM role is created, you need to assign it to your Lambda function:
 
 ## Code Example
 
+<!-- NOTE: Replace the region to the one you have configured in AWS and use an email address that is verified by SES -->
+
 ```javascript
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
-// Initialize the SES client
-const sesClient = new SESClient({ region: "ap-south-1" });
+// Initialize the SES client with a sample region
+const sesClient = new SESClient({ region: "us-east-1" }); // replace with your region
 
-// Define email parameters
-const params = {
-  Destination: {
-    ToAddresses: ["recipient@example.com"], // Make sure to use a verified email address in sandbox mode
-  },
-  Message: {
-    Body: {
-      Text: {
-        Data: "Your file restoration is complete!",
-      },
-    },
-    Subject: {
-      Data: "S3 File Restoration Complete",
-    },
-  },
-  Source: "sender@example.com", // Replace with your verified email address
-};
-
-// Lambda handler function
 export const handler = async (event) => {
   try {
+    console.log("Received event:", JSON.stringify(event, null, 2));
+
+    if (
+      !event.Records ||
+      event.Records[0].eventName !== "ObjectRestore:Completed"
+    ) {
+      console.log("Not an S3 restore completion event. Skipping.");
+      return;
+    }
+
+    let s3ObjectKey = event.Records[0].s3.object.key;
+    s3ObjectKey = decodeURIComponent(s3ObjectKey); // Decode the key
+    console.log("Decoded S3 Object Key:", s3ObjectKey);
+
+    const userEmail = s3ObjectKey.split("/")[0];
+    console.log("Extracted user email:", userEmail);
+
+    if (!userEmail.includes("@")) {
+      console.error("Invalid email extracted:", userEmail);
+      return;
+    }
+
+    const params = {
+      Destination: { ToAddresses: [userEmail] },
+      Message: {
+        Body: { Text: { Data: "Your file restoration is complete!" } },
+        Subject: { Data: "S3 File Restoration Complete" },
+      },
+      Source: "no-reply@example.com", // Replace with a verified SES email
+    };
+
     const command = new SendEmailCommand(params);
     await sesClient.send(command);
-    console.log("Email sent successfully!");
+    console.log("Email sent successfully to:", userEmail);
   } catch (error) {
     console.error("Error sending email:", error);
   }
 };
+```
+
+```json
+// sample event json for ObjectRestore:Completed
+{
+  "Records": [
+    {
+      "eventVersion": "2.1",
+      "eventSource": "aws:s3",
+      "awsRegion": "us-east-1",
+      "eventTime": "2025-03-23T13:40:53.635Z",
+      "eventName": "ObjectRestore:Completed",
+      "userIdentity": {
+        "principalId": "AmazonCustomer:EXAMPLE12345"
+      },
+      "requestParameters": {
+        "sourceIPAddress": "s3.amazonaws.com"
+      },
+      "responseElements": {
+        "x-amz-request-id": "EXAMPLEREQUEST123",
+        "x-amz-id-2": "EXAMPLEID2+RANDOMSTRING=="
+      },
+      "s3": {
+        "s3SchemaVersion": "1.0",
+        "configurationId": "RestorationEvent",
+        "bucket": {
+          "name": "sample-bucket-name",
+          "ownerIdentity": {
+            "principalId": "EXAMPLEOWNERID"
+          },
+          "arn": "arn:aws:s3:::sample-bucket-name"
+        },
+        "object": {
+          "key": "user@example.com/compressed-files-2025-03-23T08:24:58.938Z.zip",
+          "size": 448694,
+          "eTag": "EXAMPLEETAG123456",
+          "sequencer": "EXAMPLESEQ123456"
+        }
+      },
+      "glacierEventData": {
+        "restoreEventData": {
+          "lifecycleRestorationExpiryTime": "2025-03-31T00:00:00.000Z",
+          "lifecycleRestoreStorageClass": "GLACIER"
+        }
+      }
+    }
+  ]
+}
 ```
 
 - Deploy the Code & Test it out
