@@ -11,8 +11,7 @@ import {
 } from '@nestjs/common';
 import { MediaService } from './media.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { UploadRequestDto, UploadResponseDto } from './dto';
-import { UserFilesEntity } from './entities';
+import { FileMetadataDto, UploadRequestDto, UploadResponseDto } from './dto';
 
 @Controller('upload')
 export class MediaController {
@@ -49,8 +48,8 @@ export class MediaController {
     return this.mediaService.getPresignedUrl(fileKey, query.storageClass);
   }
 
-  @Post('update-metadata')
-  async updateMetadata(@Body() body: UserFilesEntity) {
-    return await this.mediaService.updateMetadata(body);
+  @Post('upload-metadata')
+  async uploadMetadata(@Body() body: FileMetadataDto) {
+    return await this.mediaService.uploadMetadata(body);
   }
 }

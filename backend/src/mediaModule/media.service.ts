@@ -8,7 +8,7 @@ import {
 } from './dto';
 import { S3Service } from 'src/s3/s3.service';
 import { StorageClass } from '@aws-sdk/client-s3';
-import { UserFilesEntity } from './entities';
+import { FileMetadata } from './entities';
 
 @Injectable()
 export class MediaService {
@@ -48,8 +48,8 @@ export class MediaService {
     return response;
   }
 
-  async updateMetadata(body: UserFilesEntity) {
-    const response = await this.mediaRepository.updateMetadata(body);
+  async uploadMetadata(body: FileMetadata) {
+    const response = await this.mediaRepository.uploadMetadata(body);
     return response;
   }
 }

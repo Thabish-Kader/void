@@ -23,7 +23,7 @@ import { PassThrough } from 'stream';
 @Injectable()
 export class S3Service {
   public readonly s3Client: S3Client;
-
+  private readonly bucketName: string;
   constructor(private readonly configService: ConfigService) {
     this.s3Client = new S3Client({
       region: getEnv(this.configService, 'AWS_REGION'),
@@ -32,6 +32,8 @@ export class S3Service {
         secretAccessKey: getEnv(this.configService, 'AWS_SECRET_ACCESS_KEY'),
       },
     });
+
+    this.bucketName = getEnv(this.configService, 'AWS_BUCKET_NAME');
   }
 
   async putObjectCommand(params: PutObjectCommandInput) {
@@ -47,7 +49,6 @@ export class S3Service {
   }
 
   async uploadCompressedFiles(
-    bucketName: string,
     fileKey: string,
     files: Express.Multer.File[],
     storageClass: StorageClass,
@@ -56,7 +57,7 @@ export class S3Service {
       const archiveStream = new PassThrough(); // Streaming ZIP archive
 
       const s3UploadParams = {
-        Bucket: bucketName,
+        Bucket: this.bucketName,
         Key: fileKey,
         Body: archiveStream, // Streaming directly to S3
         ContentType: 'application/zip',
@@ -113,9 +114,8 @@ export class S3Service {
     fileKey: string,
     storageClass: StorageClass,
   ) {
-    const bucketName = getEnv(this.configService, 'AWS_BUCKET_NAME');
     const command = new PutObjectCommand({
-      Bucket: bucketName,
+      Bucket: this.bucketName,
       Key: fileKey,
       StorageClass: storageClass,
     });
@@ -127,14 +127,14 @@ export class S3Service {
     return { signedUrl, fileKey };
   }
 
-  async generateSignedUrls<
-    T extends { bucketName: string; key: string; email: string },
-  >(data: T[]): Promise<(T & { signedUrl: string })[]> {
+  async generateSignedUrls<T extends { key: string; email: string }>(
+    data: T[],
+  ): Promise<(T & { signedUrl: string })[]> {
     const signedUrlPromises = data.map(async (item) => {
       const signedUrl = await getSignedUrl(
         this.s3Client,
         new GetObjectCommand({
-          Bucket: item.bucketName,
+          Bucket: getEnv(this.configService, 'AWS_BUCKET_NAME'),
           Key: `${item.email}/${item.key}`,
         }),
         { expiresIn: 3600 },
@@ -146,7 +146,7 @@ export class S3Service {
     return Promise.all(signedUrlPromises);
   }
 
-  async bulkRetrieveFiles<T extends { bucketName: string; key: string }>(
+  async bulkRetrieveFiles<T extends { key: string }>(
     data: T[],
   ): Promise<(T & { signedUrl?: string; restoreStatus?: string })[]> {
     const fileStatus = {
@@ -154,12 +154,13 @@ export class S3Service {
       RESTORING: 'RESTORING IN PROGRESS',
       ERROR: 'ERROR',
     };
+
     const restorePromises = data.map(async (item) => {
       try {
         // Step 1: Check if the object is already restored
         const headObject = await this.s3Client.send(
           new HeadObjectCommand({
-            Bucket: item.bucketName,
+            Bucket: this.bucketName,
             Key: item.key,
           }),
         );
@@ -183,7 +184,7 @@ export class S3Service {
           ) {
             await this.s3Client.send(
               new RestoreObjectCommand({
-                Bucket: item.bucketName,
+                Bucket: this.bucketName,
                 Key: item.key,
                 RestoreRequest: {
                   Days: 7, // Keep restored files for 7 days
@@ -202,7 +203,7 @@ export class S3Service {
         const signedUrl = await getSignedUrl(
           this.s3Client,
           new GetObjectCommand({
-            Bucket: item.bucketName,
+            Bucket: this.bucketName,
             Key: item.key,
           }),
           { expiresIn: 3600 },

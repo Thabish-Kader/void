@@ -4,7 +4,6 @@ export class UserFilesEntity {
   userId: string;
   fileId: string;
   key: string;
-  bucketName: string;
   s3Url: string;
   storageClass: StorageClass;
   uploadTimestamp: string;

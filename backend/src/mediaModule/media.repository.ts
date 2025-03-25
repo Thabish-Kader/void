@@ -11,11 +11,12 @@ import {
 } from './dto';
 
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
-import { UserFilesEntity } from './entities';
+import { FileMetadata, UserFilesEntity } from './entities';
 
 @Injectable()
 export class MediaRepository {
   private readonly fileTable = 'UserFiles';
+  private readonly metadataTable = 'FileMetadata';
   constructor(
     private readonly dbService: DbService,
     private readonly s3Service: S3Service,
@@ -33,7 +34,6 @@ export class MediaRepository {
     const folderName = `${body.email}/`;
     const fileKey = `${folderName}compressed-files-${timestamp}.zip`;
     await this.s3Service.uploadCompressedFiles(
-      bucketName,
       fileKey,
       files,
       body.storageClass,
@@ -46,7 +46,6 @@ export class MediaRepository {
         key: fileKey,
         s3Url,
         email: body.email,
-        bucketName,
         storageClass: body.storageClass,
         uploadTimestamp: timestamp,
         fileType: 'application/zip',
@@ -161,11 +160,15 @@ export class MediaRepository {
     }
   }
 
-  async updateMetadata(body: UserFilesEntity) {
+  async uploadMetadata(body: FileMetadata) {
     const response = await this.dbService.putItemCommand({
-      TableName: this.fileTable,
+      TableName: this.metadataTable,
       Item: marshall(body),
     });
-    return response;
+    if (response.$metadata.httpStatusCode === 200) {
+      return {
+        message: 'Metadata saved successfully',
+      };
+    }
   }
 }

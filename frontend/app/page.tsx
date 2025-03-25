@@ -1,11 +1,15 @@
 "use client";
+import { axiosInstance } from "@/utils";
 import { useState, ChangeEvent } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 interface Progress {
   [key: string]: number;
 }
 
 export default function Home() {
+  const email = process.env.NEXT_PUBLIC_EMAIL!;
+  const S3_BUCKET_PREFIX = process.env.NEXT_PUBLIC_S3_BUCKET_PREFIX!;
   const [files, setFiles] = useState<FileList | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [progress, setProgress] = useState<Progress>({});
@@ -20,21 +24,27 @@ export default function Home() {
 
   // Function to generate the signed URL (this would be an API call to your backend)
   const generateSignedUrlForUpload = async (
-    fileKey: string,
-    storageClass: string
+    fileName: string,
+    storageClass: string,
+    email: string
   ): Promise<{ signedUrl: string }> => {
-    const response = await fetch(
-      `http://localhost:8000/upload/presigned-url?email=kadertabish@gmail.com&storageClass=${storageClass}&fileName=${fileKey}`,
+    const res = await axiosInstance.get<{ signedUrl: string; fileKey: string }>(
+      "/upload/presigned-url",
       {
-        method: "GET",
+        params: {
+          email,
+          storageClass,
+          fileName,
+        },
       }
     );
 
-    const { signedUrl } = await response.json();
+    // Destructure signedUrl from res.data
+    const { signedUrl } = res.data;
+
     return { signedUrl };
   };
 
-  // Handle the file upload process
   const handleFileUpload = async () => {
     if (!files) return;
     setUploading(true);
@@ -43,12 +53,13 @@ export default function Home() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         // const timestamp = new Date().toISOString();
-        const fileKey = `${file.name}`;
 
+        const fileKey = `${S3_BUCKET_PREFIX}/${email}/${file.name}`;
         // Get the signed URL for uploading the file to S3
         const { signedUrl } = await generateSignedUrlForUpload(
-          fileKey,
-          "STANDARD"
+          file.name,
+          "STANDARD",
+          email
         );
 
         // Upload file using the signed URL
@@ -74,20 +85,16 @@ export default function Home() {
                 `✅ ${file.name} uploaded successfully!`,
               ]);
               // TODO: Call API to update metadata
-              // await fetch("http://localhost:8000/upload/upload-metadata", {
-              //   method: "POST",
-              //   headers: {
-              //     "Content-Type": "application/json",
-              //   },
-              //   body: JSON.stringify({
-              //     key: fileKey,
-              //     // fileId : uuidv4(),
-              //     fileName: file.name,
-              //     fileType: file.type,
-              //     fileSize: file.size,
-              //     storageClass: "STANDARD", // Change as needed
-              //   }),
-              // });
+              await axiosInstance.post("/upload/upload-metadata", {
+                email,
+                fileId: uuidv4(),
+                fileName: file.name,
+                s3Url: fileKey,
+                fileSize: file.size,
+                storageClass: "STANDARD",
+                uploadTimestamp: new Date().toISOString(),
+              });
+
               resolve();
             } else {
               reject(new Error(`Upload failed for ${file.name}`));
@@ -107,6 +114,7 @@ export default function Home() {
           error instanceof Error ? error.message : "Unknown error"
         }`,
       ]);
+      setUploading(false);
     } finally {
       setUploading(false);
     }
