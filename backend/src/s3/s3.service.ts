@@ -36,6 +36,10 @@ export class S3Service {
     this.bucketName = getEnv(this.configService, 'AWS_BUCKET_NAME');
   }
 
+  getBucketName() {
+    return this.bucketName;
+  }
+
   async putObjectCommand(params: PutObjectCommandInput) {
     return this.s3Client.send(new PutObjectCommand(params));
   }
@@ -104,6 +108,7 @@ export class S3Service {
 
       await upload.done();
       console.log(`Upload successful! File saved as ${fileKey}`);
+      return { totalInputSize };
     } catch (error) {
       console.error('Error uploading compressed files:', error);
       throw error;

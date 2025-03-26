@@ -18,12 +18,10 @@ export class MediaService {
   ) {}
 
   async uploadFiles(
-    userId: string,
     files: Express.Multer.File[],
     body: UploadRequestDto,
   ): Promise<UploadResponseDto> {
     const response = await this.mediaRepository.uploadCompressedFilesv2(
-      userId,
       files,
       body,
     );

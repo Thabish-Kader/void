@@ -20,14 +20,13 @@ export class MediaController {
   @Post('upload-files/:userId')
   @UseInterceptors(FilesInterceptor('files'))
   async uploadFiles(
-    @Param('userId') userId: string,
     @UploadedFiles() files: Express.Multer.File[],
     @Body() body: UploadRequestDto,
   ): Promise<UploadResponseDto> {
     if (!files || files.length === 0) {
       throw new BadRequestException('At least one file is required.');
     }
-    return this.mediaService.uploadFiles(userId, files, body);
+    return this.mediaService.uploadFiles(files, body);
   }
 
   @Get('get-files/:userId')

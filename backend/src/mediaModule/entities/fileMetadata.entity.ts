@@ -6,4 +6,6 @@ export class FileMetadata {
   fileName: string;
   uploadTimestamp: string;
   storageClass: StorageClass;
+  fileSize?: number;
+  s3Url: string;
 }

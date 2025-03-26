@@ -1,7 +1,6 @@
 "use client";
 import { axiosInstance } from "@/utils";
 import { useState, ChangeEvent } from "react";
-import { v4 as uuidv4 } from "uuid";
 
 interface Progress {
   [key: string]: number;
@@ -9,7 +8,6 @@ interface Progress {
 
 export default function Home() {
   const email = process.env.NEXT_PUBLIC_EMAIL!;
-  const S3_BUCKET_PREFIX = process.env.NEXT_PUBLIC_S3_BUCKET_PREFIX!;
   const [files, setFiles] = useState<FileList | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [progress, setProgress] = useState<Progress>({});
@@ -22,99 +20,44 @@ export default function Home() {
     }
   };
 
-  // Function to generate the signed URL (this would be an API call to your backend)
-  const generateSignedUrlForUpload = async (
-    fileName: string,
-    storageClass: string,
-    email: string
-  ): Promise<{ signedUrl: string }> => {
-    const res = await axiosInstance.get<{ signedUrl: string; fileKey: string }>(
-      "/upload/presigned-url",
-      {
-        params: {
-          email,
-          storageClass,
-          fileName,
-        },
-      }
-    );
-
-    // Destructure signedUrl from res.data
-    const { signedUrl } = res.data;
-
-    return { signedUrl };
-  };
-
-  const handleFileUpload = async () => {
+  const handleFilesUpload = async () => {
     if (!files) return;
     setUploading(true);
     setMessages([]);
+
     try {
+      const formData = new FormData();
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        // const timestamp = new Date().toISOString();
-
-        const fileKey = `${S3_BUCKET_PREFIX}/${email}/${file.name}`;
-        // Get the signed URL for uploading the file to S3
-        const { signedUrl } = await generateSignedUrlForUpload(
-          file.name,
-          "STANDARD",
-          email
-        );
-
-        // Upload file using the signed URL
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", signedUrl);
-          xhr.setRequestHeader("Content-Type", file.type);
-
-          // Track upload progress
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
+        formData.append("files", files[i]);
+      }
+      formData.append("storageClass", "STANDARD");
+      formData.append("email", email);
+      const res = await axiosInstance.post(
+        "/upload/upload-files/1234sdfsdf99",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          onUploadProgress: (event) => {
+            if (event.total) {
+              const progress = Math.round((event.loaded / event.total) * 100);
+              console.log(`Upload Progress: ${progress}%`);
               setProgress((prev) => ({
                 ...prev,
-                [file.name]: Math.round((event.loaded / event.total) * 100),
+                progress,
               }));
             }
-          };
-
-          xhr.onload = async () => {
-            if (xhr.status === 200) {
-              setMessages((prev) => [
-                ...prev,
-                `✅ ${file.name} uploaded successfully!`,
-              ]);
-              // TODO: Call API to update metadata
-              await axiosInstance.post("/upload/upload-metadata", {
-                email,
-                fileId: uuidv4(),
-                fileName: file.name,
-                s3Url: fileKey,
-                fileSize: file.size,
-                storageClass: "STANDARD",
-                uploadTimestamp: new Date().toISOString(),
-              });
-
-              resolve();
-            } else {
-              reject(new Error(`Upload failed for ${file.name}`));
-            }
-          };
-
-          xhr.onerror = () =>
-            reject(new Error(`Upload error for ${file.name}`));
-
-          xhr.send(file);
-        });
-      }
+          },
+        }
+      );
+      setMessages((prev) => [...prev, `✅ ${res.data.message}`]);
     } catch (error) {
+      console.error(error);
       setMessages((prev) => [
         ...prev,
-        `❌ Error uploading: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
+        `❌ ${JSON.stringify(error)} upload failed!`,
       ]);
-      setUploading(false);
     } finally {
       setUploading(false);
     }
@@ -129,7 +72,7 @@ export default function Home() {
         className="bg-blue-500 p-4 rounded-xl"
       />
       <button
-        onClick={handleFileUpload}
+        onClick={handleFilesUpload}
         disabled={uploading}
         className="bg-blue-500 p-4 rounded-xl"
       >

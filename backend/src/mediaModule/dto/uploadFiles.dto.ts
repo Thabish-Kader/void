@@ -1,5 +1,5 @@
-import { IsEmail, IsEnum, IsNotEmpty } from 'class-validator';
-import { UserFilesEntity } from '../entities';
+import { IsEmail, IsEnum, IsOptional } from 'class-validator';
+import { FileMetadata } from '../entities';
 import { StorageClass } from '@aws-sdk/client-s3';
 
 export class UploadRequestDto {
@@ -11,11 +11,11 @@ export class UploadRequestDto {
   @IsEmail({}, { message: 'Invalid email format' })
   email: string;
 
-  @IsNotEmpty({ message: 'File name is required' })
+  @IsOptional()
   fileName: string;
 }
 
 export class UploadResponseDto {
   message: string;
-  files: Omit<UserFilesEntity, 'userId' | 'fileId'>[];
+  files: FileMetadata[];
 }
