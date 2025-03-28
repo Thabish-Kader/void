@@ -33,7 +33,7 @@ export class MediaRepository {
     const timestamp = new Date().toISOString();
 
     const folderName = `${body.email}/`;
-    const fileName = `compressed-files-${timestamp}.zip`;
+    const fileName = `files-${timestamp}`;
     const fileKey = `${folderName}${fileName}`;
     const data = await this.s3Service.uploadCompressedFiles(
       fileKey,
@@ -48,7 +48,7 @@ export class MediaRepository {
         storageClass: body.storageClass,
         uploadTimestamp: timestamp,
         fileName: fileName,
-        fileSize: data.totalInputSize,
+        fileSize: data.totalFileSize,
         s3Url,
       };
 

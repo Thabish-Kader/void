@@ -53,62 +53,111 @@ export class S3Service {
   }
 
   async uploadCompressedFiles(
-    fileKey: string,
+    folderKey: string,
     files: Express.Multer.File[],
     storageClass: StorageClass,
   ) {
     try {
       const archiveStream = new PassThrough(); // Streaming ZIP archive
-
-      const s3UploadParams = {
-        Bucket: this.bucketName,
-        Key: fileKey,
-        Body: archiveStream, // Streaming directly to S3
-        ContentType: 'application/zip',
-        StorageClass: storageClass,
-      };
-
-      const upload = new Upload({
-        client: this.s3Client,
-        params: s3UploadParams,
-      });
-
-      upload.on('httpUploadProgress', (progress) => {
-        const uploadedMB = progress.loaded
-          ? (progress.loaded / 1024 / 1024).toFixed(2)
-          : 'Error occured';
-        const totalMB = progress.total
-          ? (progress.total / 1024 / 1024).toFixed(2)
-          : 'Unknown';
-        console.log(`📤 Upload Progress: ${uploadedMB} MB / ${totalMB} MB`);
-      });
-
       const archive = archiver('zip', { zlib: { level: 9 } });
-      archive.pipe(archiveStream); // Ensure proper piping
 
-      let totalInputSize = 0;
+      let totalFileSize = 0;
+      const imageFiles: Express.Multer.File[] = [];
+      const otherFiles: Express.Multer.File[] = [];
+
       for (const file of files) {
         if (!file || !file.buffer || file.buffer.length === 0) {
           console.error(`Skipping empty file: ${file.originalname}`);
           continue;
         }
 
-        console.log(
-          `Adding file: ${file.originalname}, Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
-        );
-        totalInputSize += file.size;
-        archive.append(file.buffer, { name: file.originalname });
+        if (file.mimetype.startsWith('image/')) {
+          imageFiles.push(file);
+        } else {
+          otherFiles.push(file);
+        }
       }
 
-      console.log(
-        `Total input file size before compression: ${(totalInputSize / 1024 / 1024).toFixed(2)} MB`,
-      );
-      await archive.finalize(); // Ensure archive is properly finalized
-      console.log('Archive finalization complete');
+      for (const file of otherFiles) {
+        const fileKey = `${folderKey}/${file.originalname}`;
+        console.log(
+          `Uploading non-image file: ${file.originalname}, Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        );
 
-      await upload.done();
-      console.log(`Upload successful! File saved as ${fileKey}`);
-      return { totalInputSize };
+        const upload = new Upload({
+          client: this.s3Client,
+          params: {
+            Bucket: this.bucketName,
+            Key: fileKey,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+            StorageClass: storageClass,
+          },
+        });
+
+        upload.on('httpUploadProgress', (progress) => {
+          const uploadedMB = progress.loaded
+            ? (progress.loaded / 1024 / 1024).toFixed(2)
+            : 'Error occurred';
+          const totalMB = progress.total
+            ? (progress.total / 1024 / 1024).toFixed(2)
+            : 'Unknown';
+          console.log(`📤 Upload Progress: ${uploadedMB} MB / ${totalMB} MB`);
+        });
+
+        await upload.done();
+        console.log(`✅ Uploaded: ${fileKey}`);
+        totalFileSize += file.size;
+      }
+
+      if (imageFiles.length > 0) {
+        console.log(`Compressing ${imageFiles.length} images into a ZIP...`);
+
+        const s3UploadParams = {
+          Bucket: this.bucketName,
+          Key: `${folderKey}/images.zip`,
+          Body: archiveStream,
+          ContentType: 'application/zip',
+          StorageClass: storageClass,
+        };
+
+        const upload = new Upload({
+          client: this.s3Client,
+          params: s3UploadParams,
+        });
+
+        archive.on('error', (err) => {
+          console.error('Archiver Error:', err);
+          archiveStream.destroy(err);
+        });
+
+        archiveStream.on('error', (err) => {
+          console.error('Stream Error:', err);
+        });
+
+        archive.pipe(archiveStream);
+
+        for (const file of imageFiles) {
+          if (!file || !file.buffer || file.buffer.length === 0) {
+            console.error(`Skipping empty file: ${file.originalname}`);
+            continue;
+          }
+          console.log(
+            `Adding file: ${file.originalname}, Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
+          );
+          archive.append(file.buffer, { name: file.originalname });
+          totalFileSize += file.size;
+        }
+        // Finalizing the archive before upload completes
+        await archive.finalize().then(() => {
+          console.log('Archive finalization complete');
+        });
+
+        await upload.done();
+        console.log(`✅ Uploaded: ${folderKey}/images.zip`);
+      }
+
+      return { totalFileSize };
     } catch (error) {
       console.error('Error uploading compressed files:', error);
       throw error;
