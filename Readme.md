@@ -31,7 +31,7 @@ The following provides a cost breakdown for various cloud storage services based
 
 - **Retrieval/Transfer Costs**: These vary based on the amount of data retrieved and the region where the data is accessed. Be sure to check your usage and account for retrieval/transfer costs if you anticipate needing to access your data.
 
-### Steps to achive
+### Steps to achieve
 
 1. Upload files to Amazon S3 first, then use S3 Lifecycle Rules to transition them to Glacier for archival.
 2. Store metadata (URLs, retrieval status, and archive details) in DynamoDB for fast lookups.
@@ -53,48 +53,35 @@ Lambda Functions → Automate file archival & retrieval process.
 API Gateway → Users interact via a web or mobile app to upload & request retrievals.
 SNS / WebSocket Notifications → Notify users when files are ready for download.
 
-### Lifecycle Rule: Move Files to Glacier
-
-```json
-{
-  "Rules": [
-    {
-      "ID": "MoveToGlacier",
-      "Status": "Enabled",
-      "Filter": {},
-      "Transitions": [
-        {
-          "Days": 30,
-          "StorageClass": "GLACIER"
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Challenges
-
-1. Bulk Upload
-
-### Todo
-
-- [x] Configure Aws for DynamoDB, S3 Glacier
-- [x] Service for DynamoDb
-- [x] Service for S3
-- [ ] Upload pic/video to s3
-- [ ] Download pic/video from s3
-- [ ] Configure S3 Glacier
-- [ ] S3 Glacier Retrieval logic
-- [ ] Frontend UI
-- [ ] Bulk Upload
-- [ ] Auth
-
 # AWS Configuration Steps
 
 # 1. IAM - Provide access to DynamoDb and S3
 
 # 2. Create DynamoDB Tables & Create Bucket for S3
+
+### 1. After Creating Lambda Function details in step 4 configure events to send to lambda function
+
+- Navigate to properties
+- Go to Event notification
+- Check Restore completed
+- Under Destination select Lambda function
+- Under Specify Lambda function select Choose from your Lambda functions
+- In the dropdown select the lambda function created
+
+### 2. Enable Cors for S3
+
+Go to the bucket create -> navigate to permissions -> go to Cross-origin resource sharing (CORS) and paste the following for dev
+
+```json
+[
+  {
+    "AllowedHeaders": ["Content-Type", "Authorization", "x-amz-security-token"],
+    "AllowedMethods": ["PUT", "POST", "GET", "DELETE"],
+    "AllowedOrigins": ["http://localhost:3000"], // change to prod domain once live
+    "ExposeHeaders": []
+  }
+]
+```
 
 # 3. SES
 
@@ -182,40 +169,102 @@ Once your IAM role is created, you need to assign it to your Lambda function:
 
 ## Code Example
 
+<!-- NOTE: Replace the region to the one you have configured in AWS and use an email address that is verified by SES -->
+
 ```javascript
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
-// Initialize the SES client
-const sesClient = new SESClient({ region: "ap-south-1" });
+// Initialize the SES client with a sample region
+const sesClient = new SESClient({ region: "us-east-1" }); // replace with your region
 
-// Define email parameters
-const params = {
-  Destination: {
-    ToAddresses: ["recipient@example.com"], // Make sure to use a verified email address in sandbox mode
-  },
-  Message: {
-    Body: {
-      Text: {
-        Data: "Your file restoration is complete!",
-      },
-    },
-    Subject: {
-      Data: "S3 File Restoration Complete",
-    },
-  },
-  Source: "sender@example.com", // Replace with your verified email address
-};
-
-// Lambda handler function
 export const handler = async (event) => {
   try {
+    console.log("Received event:", JSON.stringify(event, null, 2));
+
+    if (
+      !event.Records ||
+      event.Records[0].eventName !== "ObjectRestore:Completed"
+    ) {
+      console.log("Not an S3 restore completion event. Skipping.");
+      return;
+    }
+
+    let s3ObjectKey = event.Records[0].s3.object.key;
+    s3ObjectKey = decodeURIComponent(s3ObjectKey); // Decode the key
+    console.log("Decoded S3 Object Key:", s3ObjectKey);
+
+    const userEmail = s3ObjectKey.split("/")[0];
+    console.log("Extracted user email:", userEmail);
+
+    if (!userEmail.includes("@")) {
+      console.error("Invalid email extracted:", userEmail);
+      return;
+    }
+
+    const params = {
+      Destination: { ToAddresses: [userEmail] },
+      Message: {
+        Body: { Text: { Data: "Your file restoration is complete!" } },
+        Subject: { Data: "S3 File Restoration Complete" },
+      },
+      Source: "no-reply@example.com", // Replace with a verified SES email
+    };
+
     const command = new SendEmailCommand(params);
     await sesClient.send(command);
-    console.log("Email sent successfully!");
+    console.log("Email sent successfully to:", userEmail);
   } catch (error) {
     console.error("Error sending email:", error);
   }
 };
+```
+
+```json
+// sample event json for ObjectRestore:Completed
+{
+  "Records": [
+    {
+      "eventVersion": "2.1",
+      "eventSource": "aws:s3",
+      "awsRegion": "us-east-1",
+      "eventTime": "2025-03-23T13:40:53.635Z",
+      "eventName": "ObjectRestore:Completed",
+      "userIdentity": {
+        "principalId": "AmazonCustomer:EXAMPLE12345"
+      },
+      "requestParameters": {
+        "sourceIPAddress": "s3.amazonaws.com"
+      },
+      "responseElements": {
+        "x-amz-request-id": "EXAMPLEREQUEST123",
+        "x-amz-id-2": "EXAMPLEID2+RANDOMSTRING=="
+      },
+      "s3": {
+        "s3SchemaVersion": "1.0",
+        "configurationId": "RestorationEvent",
+        "bucket": {
+          "name": "sample-bucket-name",
+          "ownerIdentity": {
+            "principalId": "EXAMPLEOWNERID"
+          },
+          "arn": "arn:aws:s3:::sample-bucket-name"
+        },
+        "object": {
+          "key": "user@example.com/compressed-files-2025-03-23T08:24:58.938Z.zip",
+          "size": 448694,
+          "eTag": "EXAMPLEETAG123456",
+          "sequencer": "EXAMPLESEQ123456"
+        }
+      },
+      "glacierEventData": {
+        "restoreEventData": {
+          "lifecycleRestorationExpiryTime": "2025-03-31T00:00:00.000Z",
+          "lifecycleRestoreStorageClass": "GLACIER"
+        }
+      }
+    }
+  ]
+}
 ```
 
 - Deploy the Code & Test it out

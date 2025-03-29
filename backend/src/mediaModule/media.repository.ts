@@ -11,61 +11,58 @@ import {
 } from './dto';
 
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
-import { UserFilesEntity } from './entities';
+import { FileMetadata, UserFilesEntity } from './entities';
 
 @Injectable()
 export class MediaRepository {
   private readonly fileTable = 'UserFiles';
+  private readonly metadataTable = 'FileMetadata';
+  private readonly bucketName;
   constructor(
     private readonly dbService: DbService,
     private readonly s3Service: S3Service,
-  ) {}
+  ) {
+    this.bucketName = this.s3Service.getBucketName();
+  }
 
   // With @aws-sdk/lib-storage
   async uploadCompressedFilesv2(
-    userId: string,
     files: Express.Multer.File[],
     body: UploadRequestDto,
   ): Promise<UploadResponseDto> {
     const timestamp = new Date().toISOString();
-    const bucketName = `user-${userId}`;
-    await this.bucketExists(bucketName);
+
     const folderName = `${body.email}/`;
-    const fileKey = `${folderName}compressed-files-${timestamp}.zip`;
-    await this.s3Service.uploadCompressedFiles(
-      bucketName,
+    const fileName = `files-${timestamp}`;
+    const fileKey = `${folderName}${fileName}`;
+    const data = await this.s3Service.uploadCompressedFiles(
       fileKey,
       files,
       body.storageClass,
     );
     try {
-      const s3Url = `s3://${bucketName}/${fileKey}`;
-      const uploadItem: UserFilesEntity = {
-        userId,
+      const s3Url = `s3://${this.bucketName}/${fileKey}`;
+      const uploadItem: FileMetadata = {
         fileId: uuidv4(),
-        key: fileKey,
-        s3Url,
         email: body.email,
-        bucketName,
         storageClass: body.storageClass,
         uploadTimestamp: timestamp,
-        fileType: 'application/zip',
+        fileName: fileName,
+        fileSize: data.totalFileSize,
+        s3Url,
       };
 
       const marshalledItem = marshall(uploadItem);
       await this.dbService.putItemCommand({
-        TableName: this.fileTable,
+        TableName: this.metadataTable,
         Item: marshalledItem,
       });
 
       console.log('ZIP file metadata saved to DynamoDB');
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { userId: _userId, fileId: _fileId, ...resItem } = uploadItem;
-
       return {
         message: 'Files compressed and saved successfully as a ZIP',
-        files: [resItem],
+        files: [uploadItem],
       };
     } catch (error) {
       console.error('Error saving files', error);
@@ -158,6 +155,18 @@ export class MediaRepository {
       } else {
         throw error;
       }
+    }
+  }
+
+  async uploadMetadata(body: FileMetadata) {
+    const response = await this.dbService.putItemCommand({
+      TableName: this.metadataTable,
+      Item: marshall(body),
+    });
+    if (response.$metadata.httpStatusCode === 200) {
+      return {
+        message: 'Metadata saved successfully',
+      };
     }
   }
 }

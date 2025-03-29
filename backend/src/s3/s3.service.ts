@@ -23,7 +23,7 @@ import { PassThrough } from 'stream';
 @Injectable()
 export class S3Service {
   public readonly s3Client: S3Client;
-
+  private readonly bucketName: string;
   constructor(private readonly configService: ConfigService) {
     this.s3Client = new S3Client({
       region: getEnv(this.configService, 'AWS_REGION'),
@@ -32,6 +32,12 @@ export class S3Service {
         secretAccessKey: getEnv(this.configService, 'AWS_SECRET_ACCESS_KEY'),
       },
     });
+
+    this.bucketName = getEnv(this.configService, 'AWS_BUCKET_NAME');
+  }
+
+  getBucketName() {
+    return this.bucketName;
   }
 
   async putObjectCommand(params: PutObjectCommandInput) {
@@ -47,76 +53,142 @@ export class S3Service {
   }
 
   async uploadCompressedFiles(
-    bucketName: string,
-    fileKey: string,
+    folderKey: string,
     files: Express.Multer.File[],
     storageClass: StorageClass,
   ) {
     try {
       const archiveStream = new PassThrough(); // Streaming ZIP archive
-
-      const s3UploadParams = {
-        Bucket: bucketName,
-        Key: fileKey,
-        Body: archiveStream, // Streaming directly to S3
-        ContentType: 'application/zip',
-        StorageClass: storageClass,
-      };
-
-      const upload = new Upload({
-        client: this.s3Client,
-        params: s3UploadParams,
-      });
-
-      upload.on('httpUploadProgress', (progress) => {
-        const uploadedMB = progress.loaded
-          ? (progress.loaded / 1024 / 1024).toFixed(2)
-          : 'Error occured';
-        const totalMB = progress.total
-          ? (progress.total / 1024 / 1024).toFixed(2)
-          : 'Unknown';
-        console.log(`📤 Upload Progress: ${uploadedMB} MB / ${totalMB} MB`);
-      });
-
       const archive = archiver('zip', { zlib: { level: 9 } });
-      archive.pipe(archiveStream); // Ensure proper piping
 
-      let totalInputSize = 0;
+      let totalFileSize = 0;
+      const imageFiles: Express.Multer.File[] = [];
+      const otherFiles: Express.Multer.File[] = [];
+
       for (const file of files) {
         if (!file || !file.buffer || file.buffer.length === 0) {
           console.error(`Skipping empty file: ${file.originalname}`);
           continue;
         }
 
-        console.log(
-          `Adding file: ${file.originalname}, Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
-        );
-        totalInputSize += file.size;
-        archive.append(file.buffer, { name: file.originalname });
+        if (file.mimetype.startsWith('image/')) {
+          imageFiles.push(file);
+        } else {
+          otherFiles.push(file);
+        }
       }
 
-      console.log(
-        `Total input file size before compression: ${(totalInputSize / 1024 / 1024).toFixed(2)} MB`,
-      );
-      await archive.finalize(); // Ensure archive is properly finalized
-      console.log('Archive finalization complete');
+      for (const file of otherFiles) {
+        const fileKey = `${folderKey}/${file.originalname}`;
+        console.log(
+          `Uploading non-image file: ${file.originalname}, Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        );
 
-      await upload.done();
-      console.log(`Upload successful! File saved as ${fileKey}`);
+        const upload = new Upload({
+          client: this.s3Client,
+          params: {
+            Bucket: this.bucketName,
+            Key: fileKey,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+            StorageClass: storageClass,
+          },
+        });
+
+        upload.on('httpUploadProgress', (progress) => {
+          const uploadedMB = progress.loaded
+            ? (progress.loaded / 1024 / 1024).toFixed(2)
+            : 'Error occurred';
+          const totalMB = progress.total
+            ? (progress.total / 1024 / 1024).toFixed(2)
+            : 'Unknown';
+          console.log(`📤 Upload Progress: ${uploadedMB} MB / ${totalMB} MB`);
+        });
+
+        await upload.done();
+        console.log(`✅ Uploaded: ${fileKey}`);
+        totalFileSize += file.size;
+      }
+
+      if (imageFiles.length > 0) {
+        console.log(`Compressing ${imageFiles.length} images into a ZIP...`);
+
+        const s3UploadParams = {
+          Bucket: this.bucketName,
+          Key: `${folderKey}/images.zip`,
+          Body: archiveStream,
+          ContentType: 'application/zip',
+          StorageClass: storageClass,
+        };
+
+        const upload = new Upload({
+          client: this.s3Client,
+          params: s3UploadParams,
+        });
+
+        archive.on('error', (err) => {
+          console.error('Archiver Error:', err);
+          archiveStream.destroy(err);
+        });
+
+        archiveStream.on('error', (err) => {
+          console.error('Stream Error:', err);
+        });
+
+        archive.pipe(archiveStream);
+
+        for (const file of imageFiles) {
+          if (!file || !file.buffer || file.buffer.length === 0) {
+            console.error(`Skipping empty file: ${file.originalname}`);
+            continue;
+          }
+          console.log(
+            `Adding file: ${file.originalname}, Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
+          );
+          archive.append(file.buffer, { name: file.originalname });
+          totalFileSize += file.size;
+        }
+        // Finalizing the archive before upload completes
+        await archive.finalize().then(() => {
+          console.log('Archive finalization complete');
+        });
+
+        await upload.done();
+        console.log(`✅ Uploaded: ${folderKey}/images.zip`);
+      }
+
+      return { totalFileSize };
     } catch (error) {
       console.error('Error uploading compressed files:', error);
       throw error;
     }
   }
 
-  async generateSignedUrls<
-    T extends { bucketName: string; key: string; email: string },
-  >(data: T[]): Promise<(T & { signedUrl: string })[]> {
+  async generateSignedUrlForUpload(
+    fileKey: string,
+    storageClass: StorageClass,
+  ) {
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: fileKey,
+      StorageClass: storageClass,
+    });
+
+    const signedUrl = await getSignedUrl(this.s3Client, command, {
+      expiresIn: 3600,
+    });
+
+    return { signedUrl, fileKey };
+  }
+
+  async generateSignedUrls<T extends { key: string; email: string }>(
+    data: T[],
+  ): Promise<(T & { signedUrl: string })[]> {
     const signedUrlPromises = data.map(async (item) => {
       const signedUrl = await getSignedUrl(
         this.s3Client,
         new GetObjectCommand({
-          Bucket: item.bucketName,
+          Bucket: getEnv(this.configService, 'AWS_BUCKET_NAME'),
           Key: `${item.email}/${item.key}`,
         }),
         { expiresIn: 3600 },
@@ -128,7 +200,7 @@ export class S3Service {
     return Promise.all(signedUrlPromises);
   }
 
-  async bulkRetrieveFiles<T extends { bucketName: string; key: string }>(
+  async bulkRetrieveFiles<T extends { key: string }>(
     data: T[],
   ): Promise<(T & { signedUrl?: string; restoreStatus?: string })[]> {
     const fileStatus = {
@@ -136,12 +208,13 @@ export class S3Service {
       RESTORING: 'RESTORING IN PROGRESS',
       ERROR: 'ERROR',
     };
+
     const restorePromises = data.map(async (item) => {
       try {
         // Step 1: Check if the object is already restored
         const headObject = await this.s3Client.send(
           new HeadObjectCommand({
-            Bucket: item.bucketName,
+            Bucket: this.bucketName,
             Key: item.key,
           }),
         );
@@ -165,7 +238,7 @@ export class S3Service {
           ) {
             await this.s3Client.send(
               new RestoreObjectCommand({
-                Bucket: item.bucketName,
+                Bucket: this.bucketName,
                 Key: item.key,
                 RestoreRequest: {
                   Days: 7, // Keep restored files for 7 days
@@ -184,7 +257,7 @@ export class S3Service {
         const signedUrl = await getSignedUrl(
           this.s3Client,
           new GetObjectCommand({
-            Bucket: item.bucketName,
+            Bucket: this.bucketName,
             Key: item.key,
           }),
           { expiresIn: 3600 },
