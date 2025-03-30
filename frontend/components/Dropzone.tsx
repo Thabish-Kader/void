@@ -1,99 +1,64 @@
 "use client";
+import { FileWithPreview } from "@/types";
 import { generateVideoThumbnail } from "@/utils";
-import Image from "next/image";
 import React, { useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { IoImages } from "react-icons/io5";
+import { Thumbnail } from "./Thumbnail";
+import { handleFilesUpload } from "@/api";
+import { Button } from "./common";
 
-const baseStyle = {
-  flex: 1,
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  padding: "20px",
-  borderWidth: 2,
-  borderRadius: 2,
-  borderColor: "#bdbdbd",
-  borderStyle: "dashed",
-  backgroundColor: "#fafafa",
-  color: "#bdbdbd",
-  outline: "none",
-  cursor: "pointer",
-  transition: "border .24s ease-in-out",
+const DROPZONE_STYLES = {
+  base: "flex flex-col items-center p-5 border-2 border-dashed border-gray-400 bg-gray-100 text-gray-500 cursor-pointer transition-all",
+  focus: "border-blue-500 bg-blue-50",
+  accept: "border-blue-500 bg-blue-50",
+  reject: "border-red-500",
 };
 
-const focusedStyle = {
-  borderColor: "#2196f3",
-  backgroundColor: "#e3f2fd",
-};
-
-const acceptStyle = {
-  borderColor: "#2196f3",
-  backgroundColor: "#e3f2fd",
-};
-
-const rejectStyle = {
-  borderColor: "#ff1744",
-};
-
-type FileWithPreview = File & { preview: string };
 export const Dropzone = () => {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
-  const {
-    acceptedFiles,
-    getRootProps,
-    getInputProps,
-    isFocused,
-    isDragAccept,
-    isDragReject,
-  } = useDropzone({
-    onDrop: async (acceptedFiles) => {
-      const filePreviews = await Promise.all(
-        acceptedFiles.map(async (file) => {
-          let preview;
-          if (file.type.startsWith("video/")) {
-            preview = await generateVideoThumbnail(file);
-          } else {
-            preview = URL.createObjectURL(file);
-          }
+  const [isLoading, setIsLoading] = useState(false);
 
-          return Object.assign(file, { preview });
-        })
-      );
-      setFiles(filePreviews);
-    },
-  });
+  const email = process.env.NEXT_PUBLIC_EMAIL!;
+  const { getRootProps, getInputProps, isFocused, isDragAccept, isDragReject } =
+    useDropzone({
+      onDrop: async (acceptedFiles) => {
+        const filePreviews = await Promise.all(
+          acceptedFiles.map(async (file) => {
+            let preview;
+            if (file.type.startsWith("video/")) {
+              preview = await generateVideoThumbnail(file);
+            } else {
+              preview = URL.createObjectURL(file);
+            }
 
-  const thumbs = files.map((file: FileWithPreview) => (
-    <div key={file.name}>
-      <div className="relative h-40 w-40">
-        <Image
-          src={file.preview}
-          onLoad={() => {
-            URL.revokeObjectURL(file.preview);
-          }}
-          alt={file.name}
-          layout="fill"
-          className="rounded-md"
-          objectFit="cover"
-        />
-      </div>
-    </div>
-  ));
+            return Object.assign(file, { preview });
+          })
+        );
+        setFiles(filePreviews);
+      },
+    });
 
-  const style = useMemo(
-    () => ({
-      ...baseStyle,
-      ...(isFocused ? focusedStyle : {}),
-      ...(isDragAccept ? acceptStyle : {}),
-      ...(isDragReject ? rejectStyle : {}),
-    }),
+  const dropzoneClass = useMemo(
+    () =>
+      [
+        DROPZONE_STYLES.base,
+        isFocused && DROPZONE_STYLES.focus,
+        isDragAccept && DROPZONE_STYLES.accept,
+        isDragReject && DROPZONE_STYLES.reject,
+      ]
+        .filter(Boolean)
+        .join(" "),
     [isFocused, isDragAccept, isDragReject]
   );
 
+  const handleFileUpload = async () => {
+    await handleFilesUpload(files, email, setIsLoading);
+  };
+
   return (
     <div className="bg-white p-4 rounded-xl min-w-2xl space-y-2">
-      <div {...getRootProps({ style: style as React.CSSProperties })}>
+      <div {...getRootProps({ className: dropzoneClass })}>
         <input {...getInputProps()} />
         <div className="flex flex-col items-center justify-center space-y-3">
           <IoImages size={50} className="text-blue-500" />
@@ -106,13 +71,10 @@ export const Dropzone = () => {
 
       {files.length > 0 && (
         <>
-          <div className="grid grid-cols-4 gap-2 overflow-y-scroll max-h-80">
-            {thumbs}
-          </div>
-
-          <button className="bg-blue-500 text-white p-2 rounded-lg w-full">
+          <Thumbnail files={files} />
+          <Button isLoading={isLoading} onClick={handleFileUpload}>
             Upload {files.length} Files
-          </button>
+          </Button>
         </>
       )}
     </div>
