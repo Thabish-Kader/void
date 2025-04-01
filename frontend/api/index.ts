@@ -25,7 +25,7 @@ export const handleFilesUpload = async (
       }
     );
 
-    return res.data;
+    return res;
   } catch (error) {
     console.error(error);
   } finally {

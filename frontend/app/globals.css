@@ -1,26 +1,79 @@
+@import url(https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;700&amp;display=swap);
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --linear-graidient:linear-gradient(-225deg, #7DE2FC 0%, #B9B6E5 100%);
+  --hue: 223;
+  --trans-dur: 0.3s;
 }
+
+@keyframes spinOnce {
+  from {
+    transform: rotate(0deg);
+    scale: 200%;
+  }
+  to {
+    transform: rotate(360deg);
+    scale: 100%;
+
+  }
+}
+
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-roboto: "Nunito", sans-serif; 
+  --color-secondary: hsl(var(--hue), 10%, 10%);
+  --color-primary-accent: hsl(var(--hue), 10%, 95%);
+  --color-secondary-accent:hsl(var(--hue), 10%, 70%);
+  --animate-ping:ping 1s cubic-bezier(0, 0, 0.2, 1) forwards;
+  --animate-spin:spinOnce 1s linear forwards;
 }
+
+@layer components {
+  .btn, .modal-btn {
+    cursor: pointer;
+    padding: 0.375rem 2rem;
+    transition: background-color var(--trans-dur), color var(--trans-dur);
+  }
+
+  .btn {
+    background-color: transparent;
+    border: 0.125rem dashed hsla(var(--hue), 10%, 50%, 0.4);
+    flex: 1;
+    border-radius: var(--radius-xl);
+  }
+
+  .btn:hover {
+    background-color: hsla(var(--hue), 10%, 60%, 0.2);
+  }
+
+  .modal-btn {
+    background-color: hsla(var(--hue), 10%, 50%, 0.2);
+    border-radius: 0.25rem;
+    font-size: 0.75em;
+    transition: background-color var(--trans-dur), border-color var(--trans-dur), opacity var(--trans-dur);
+  }
+
+  .modal-btn:hover {
+    background-color: hsla(var(--hue), 10%, 60%, 0.2);
+  }
+}
+
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;  
+  background-image: var(--linear-graidient);
+  font-family: Nunito, Arial, Helvetica, sans-serif;  
+  background-color: hsla(var(--hue),10%,60%,0.2);
 }
+
