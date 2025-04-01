@@ -18,7 +18,10 @@ const DROPZONE_STYLES = {
 export const Dropzone = () => {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
+  const [dataStatus, setDataStatus] = useState({
+    isLoading: false,
+    success: true,
+  });
   const email = process.env.NEXT_PUBLIC_EMAIL!;
   const { getRootProps, getInputProps, isFocused, isDragAccept, isDragReject } =
     useDropzone({
@@ -53,11 +56,23 @@ export const Dropzone = () => {
   );
 
   const handleFileUpload = async () => {
-    await handleFilesUpload(files, email, setIsLoading);
+    const res = new Promise((resolve) => {
+      setIsLoading(true);
+      setTimeout(() => {
+        setIsLoading(false);
+        setFiles([]);
+        resolve({
+          data: {
+            files: files.map((file) => file.preview),
+          },
+        });
+      }, 3000);
+    });
+    // const res = await handleFilesUpload(files, email, setIsLoading);
   };
 
   return (
-    <div className="bg-white p-4 rounded-xl min-w-2xl space-y-2">
+    <div className="bg-white p-4 rounded-xl max-w-3xl w-full space-y-2">
       <div {...getRootProps({ className: dropzoneClass })}>
         <input {...getInputProps()} />
         <div className="flex flex-col items-center justify-center space-y-3">
@@ -72,10 +87,15 @@ export const Dropzone = () => {
       {files.length > 0 && (
         <>
           <Thumbnail files={files} />
-          <Button isLoading={isLoading} onClick={handleFileUpload}>
+          <Button isLoading={dataStatus.isLoading} onClick={handleFileUpload}>
             Upload {files.length} Files
           </Button>
         </>
+      )}
+      {dataStatus.success && (
+        <div className="bg-green-500 w-full rounded-md text-gray-200 p-2 font-bold text-center">
+          <p>Files uploaded successfully</p>
+        </div>
       )}
     </div>
   );
