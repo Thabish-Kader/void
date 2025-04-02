@@ -19,7 +19,7 @@ export const FileButton = ({ setFiles }: FileButtonProps) => {
   return (
     <>
       <button
-        className="btn rounded"
+        className="modal-btn"
         onClick={() => fileInputRef.current?.click()}
       >
         Choose File

@@ -4,7 +4,6 @@
 :root {
   --background: #0a0a0a;
   --foreground: #ededed;
-  --linear-graidient:linear-gradient(-225deg, #7DE2FC 0%, #B9B6E5 100%);
   --hue: 223;
   --trans-dur: 0.3s;
 }
@@ -32,7 +31,7 @@
   --color-primary-accent: hsl(var(--hue), 10%, 95%);
   --color-secondary-accent:hsl(var(--hue), 10%, 70%);
   --animate-ping:ping 1s cubic-bezier(0, 0, 0.2, 1) forwards;
-  --animate-spin:spinOnce 1s linear forwards;
+  --animate-spin-once:spinOnce 1s linear forwards;
 }
 
 @layer components {
@@ -72,8 +71,7 @@
 }
 
 body {
-  background-image: var(--linear-graidient);
   font-family: Nunito, Arial, Helvetica, sans-serif;  
-  background-color: hsla(var(--hue),10%,60%,0.2);
+  background-color: var(--background);
 }
 

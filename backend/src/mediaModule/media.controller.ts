@@ -51,4 +51,9 @@ export class MediaController {
   async uploadMetadata(@Body() body: FileMetadataDto) {
     return await this.mediaService.uploadMetadata(body);
   }
+
+  @Get('list-of-files')
+  async getListOfFiles(@Query('email') folderName: string) {
+    return await this.mediaService.getListOfFiles(folderName);
+  }
 }

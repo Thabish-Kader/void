@@ -10,6 +10,8 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   RestoreObjectCommand,
+  ListObjectsV2CommandInput,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -50,6 +52,10 @@ export class S3Service {
 
   async createBucketCommand(params: CreateBucketCommandInput) {
     return this.s3Client.send(new CreateBucketCommand(params));
+  }
+
+  async listObjectsV2Command(params: ListObjectsV2CommandInput) {
+    return this.s3Client.send(new ListObjectsV2Command(params));
   }
 
   async uploadCompressedFiles(
