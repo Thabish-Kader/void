@@ -50,4 +50,9 @@ export class MediaService {
     const response = await this.mediaRepository.uploadMetadata(body);
     return response;
   }
+
+  async getListOfFiles(folderName: string) {
+    const response = await this.mediaRepository.getListOfFiles(folderName);
+    return response;
+  }
 }

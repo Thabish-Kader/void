@@ -17,7 +17,7 @@ import { FileMetadata, UserFilesEntity } from './entities';
 export class MediaRepository {
   private readonly fileTable = 'UserFiles';
   private readonly metadataTable = 'FileMetadata';
-  private readonly bucketName;
+  private readonly bucketName: string;
   constructor(
     private readonly dbService: DbService,
     private readonly s3Service: S3Service,
@@ -167,6 +167,25 @@ export class MediaRepository {
       return {
         message: 'Metadata saved successfully',
       };
+    }
+  }
+
+  async getListOfFiles(folderName: string) {
+    const command = {
+      Bucket: this.bucketName,
+      Prefix: folderName + '/',
+      Delimiter: '/',
+    };
+    try {
+      const response = await this.s3Service.listObjectsV2Command(command);
+      const files = response.CommonPrefixes?.map((item) => {
+        const fileName = item.Prefix?.replace(folderName + '/', '');
+        return fileName;
+      });
+      return files;
+    } catch (error) {
+      console.error('Error listing files:', error);
+      throw error;
     }
   }
 }
