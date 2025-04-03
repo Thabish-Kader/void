@@ -17,8 +17,12 @@ import { FileMetadataDto, UploadRequestDto, UploadResponseDto } from './dto';
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
 
-  @Post('upload-files/:userId')
-  @UseInterceptors(FilesInterceptor('files'))
+  @Post('upload-files')
+  @UseInterceptors(
+    FilesInterceptor('files', 100, {
+      limits: { fileSize: 1 * 1024 * 1024 * 1024 },
+    }),
+  )
   async uploadFiles(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() body: UploadRequestDto,
