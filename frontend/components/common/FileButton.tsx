@@ -3,16 +3,16 @@
 import React, { useRef } from "react";
 
 type FileButtonProps = {
-  setFiles: React.Dispatch<React.SetStateAction<File[]>>;
+  handleFileChange: (files: File[]) => void;
 };
 
-export const FileButton = ({ setFiles }: FileButtonProps) => {
+export const FileButton = ({ handleFileChange }: FileButtonProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileInputChange = () => {
     if (fileInputRef.current && fileInputRef.current.files) {
       const files = Array.from(fileInputRef.current.files);
-      setFiles(files);
+      handleFileChange(files);
     }
   };
 
