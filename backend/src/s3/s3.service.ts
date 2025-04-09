@@ -66,7 +66,7 @@ export class S3Service {
     try {
       const archiveStream = new PassThrough(); // Streaming ZIP archive
       const archive = archiver('zip', { zlib: { level: 9 } });
-
+      const filesKey: string[] = [];
       let totalFileSize = 0;
       const imageFiles: Express.Multer.File[] = [];
       const otherFiles: Express.Multer.File[] = [];
@@ -85,7 +85,7 @@ export class S3Service {
       }
 
       for (const file of otherFiles) {
-        const fileKey = `${folderKey}/${file.originalname}`;
+        const fileKey = `${folderKey}-${file.originalname}`;
         console.log(
           `Uploading non-image file: ${file.originalname}, Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
         );
@@ -114,14 +114,16 @@ export class S3Service {
         await upload.done();
         console.log(`✅ Uploaded: ${fileKey}`);
         totalFileSize += file.size;
+        filesKey.push(fileKey);
       }
 
       if (imageFiles.length > 0) {
+        const imagesKey = `${folderKey}-images.zip`;
         console.log(`Compressing ${imageFiles.length} images into a ZIP...`);
-
+        filesKey.push(imagesKey);
         const s3UploadParams = {
           Bucket: this.bucketName,
-          Key: `${folderKey}/images.zip`,
+          Key: imagesKey,
           Body: archiveStream,
           ContentType: 'application/zip',
           StorageClass: storageClass,
@@ -160,10 +162,9 @@ export class S3Service {
         });
 
         await upload.done();
-        console.log(`✅ Uploaded: ${folderKey}/images.zip`);
+        console.log(`✅ Uploaded: ${folderKey}-images.zip`);
       }
-
-      return { totalFileSize };
+      return { filesKey, totalFileSize };
     } catch (error) {
       console.error('Error uploading compressed files:', error);
       throw error;
@@ -214,7 +215,7 @@ export class S3Service {
       RESTORING: 'RESTORING IN PROGRESS',
       ERROR: 'ERROR',
     };
-
+    console.log({ data });
     const restorePromises = data.map(async (item) => {
       try {
         // Step 1: Check if the object is already restored

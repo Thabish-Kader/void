@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { MediaService } from './media.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { FileMetadataDto, UploadRequestDto, UploadResponseDto } from './dto';
+import { FileMetadataDto, UploadRequestDto } from './dto';
 
 @Controller('upload')
 export class MediaController {
@@ -26,7 +26,7 @@ export class MediaController {
   async uploadFiles(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() body: UploadRequestDto,
-  ): Promise<UploadResponseDto> {
+  ) {
     if (!files || files.length === 0) {
       throw new BadRequestException('At least one file is required.');
     }
@@ -38,9 +38,9 @@ export class MediaController {
     return this.mediaService.getFiles(userId);
   }
 
-  @Get('get-archived-files/:userId')
-  async getArchivedFiles(@Param('userId') userId: string) {
-    return this.mediaService.getArchivedFiles(userId);
+  @Get('get-archived-files/:email')
+  async getArchivedFiles(@Param('email') email: string) {
+    return this.mediaService.getArchivedFiles(email);
   }
 
   @Get('presigned-url')

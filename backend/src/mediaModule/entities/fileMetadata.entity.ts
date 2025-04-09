@@ -8,4 +8,5 @@ export class FileMetadata {
   storageClass: StorageClass;
   fileSize?: number;
   s3Url: string;
+  key: string;
 }
