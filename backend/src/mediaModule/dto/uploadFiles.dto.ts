@@ -17,5 +17,5 @@ export class UploadRequestDto {
 
 export class UploadResponseDto {
   message: string;
-  files: FileMetadata[];
+  files: any[];
 }

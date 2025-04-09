@@ -3,7 +3,6 @@ import { MediaRepository } from './media.repository';
 import {
   ArchivedFilesResponseDto,
   UploadRequestDto,
-  UploadResponseDto,
   UserFileResponseDto,
 } from './dto';
 import { S3Service } from 'src/s3/s3.service';
@@ -17,10 +16,7 @@ export class MediaService {
     private readonly s3Service: S3Service,
   ) {}
 
-  async uploadFiles(
-    files: Express.Multer.File[],
-    body: UploadRequestDto,
-  ): Promise<UploadResponseDto> {
+  async uploadFiles(files: Express.Multer.File[], body: UploadRequestDto) {
     const response = await this.mediaRepository.uploadCompressedFilesv2(
       files,
       body,
@@ -33,8 +29,8 @@ export class MediaService {
     return response;
   }
 
-  async getArchivedFiles(userId: string): Promise<ArchivedFilesResponseDto[]> {
-    const response = await this.mediaRepository.getArchivedFiles(userId);
+  async getArchivedFiles(email: string): Promise<ArchivedFilesResponseDto[]> {
+    const response = await this.mediaRepository.getArchivedFiles(email);
     return response;
   }
 
@@ -48,6 +44,11 @@ export class MediaService {
 
   async uploadMetadata(body: FileMetadata) {
     const response = await this.mediaRepository.uploadMetadata(body);
+    return response;
+  }
+
+  async getListOfFiles(folderName: string) {
+    const response = await this.mediaRepository.getListOfFiles(folderName);
     return response;
   }
 }

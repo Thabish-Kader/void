@@ -6,7 +6,6 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   ArchivedFilesResponseDto,
   UploadRequestDto,
-  UploadResponseDto,
   UserFileResponseDto,
 } from './dto';
 
@@ -17,7 +16,7 @@ import { FileMetadata, UserFilesEntity } from './entities';
 export class MediaRepository {
   private readonly fileTable = 'UserFiles';
   private readonly metadataTable = 'FileMetadata';
-  private readonly bucketName;
+  private readonly bucketName: string;
   constructor(
     private readonly dbService: DbService,
     private readonly s3Service: S3Service,
@@ -29,40 +28,42 @@ export class MediaRepository {
   async uploadCompressedFilesv2(
     files: Express.Multer.File[],
     body: UploadRequestDto,
-  ): Promise<UploadResponseDto> {
+  ) {
     const timestamp = new Date().toISOString();
 
     const folderName = `${body.email}/`;
     const fileName = `files-${timestamp}`;
     const fileKey = `${folderName}${fileName}`;
-    const data = await this.s3Service.uploadCompressedFiles(
+    const result = await this.s3Service.uploadCompressedFiles(
       fileKey,
       files,
       body.storageClass,
     );
     try {
-      const s3Url = `s3://${this.bucketName}/${fileKey}`;
-      const uploadItem: FileMetadata = {
-        fileId: uuidv4(),
-        email: body.email,
-        storageClass: body.storageClass,
-        uploadTimestamp: timestamp,
-        fileName: fileName,
-        fileSize: data.totalFileSize,
-        s3Url,
-      };
+      for (const file of result.filesKey) {
+        const s3Url = `s3://${this.bucketName}/${file}`;
+        const uploadItem: FileMetadata = {
+          fileId: uuidv4(),
+          email: body.email,
+          storageClass: body.storageClass,
+          uploadTimestamp: timestamp,
+          fileName: fileName,
+          fileSize: result.totalFileSize,
+          s3Url,
+          key: file,
+        };
 
-      const marshalledItem = marshall(uploadItem);
-      await this.dbService.putItemCommand({
-        TableName: this.metadataTable,
-        Item: marshalledItem,
-      });
+        const marshalledItem = marshall(uploadItem);
+        await this.dbService.putItemCommand({
+          TableName: this.metadataTable,
+          Item: marshalledItem,
+        });
 
-      console.log('ZIP file metadata saved to DynamoDB');
-
+        console.log('ZIP file metadata saved to DynamoDB');
+      }
       return {
         message: 'Files compressed and saved successfully as a ZIP',
-        files: [uploadItem],
+        files: result,
       };
     } catch (error) {
       console.error('Error saving files', error);
@@ -105,12 +106,12 @@ export class MediaRepository {
     return response;
   }
 
-  async getArchivedFiles(userId: string): Promise<ArchivedFilesResponseDto[]> {
+  async getArchivedFiles(email: string): Promise<ArchivedFilesResponseDto[]> {
     const queryCommand = {
-      TableName: this.fileTable,
-      KeyConditionExpression: 'userId = :userId',
+      TableName: this.metadataTable,
+      KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: {
-        ':userId': { S: userId },
+        ':email': { S: email },
       },
     };
 
@@ -122,7 +123,6 @@ export class MediaRepository {
     const users: UserFilesEntity[] = result.Items.map(
       (item) => unmarshall(item) as UserFilesEntity,
     );
-
     const fileData =
       await this.s3Service.bulkRetrieveFiles<UserFilesEntity>(users);
 
@@ -167,6 +167,25 @@ export class MediaRepository {
       return {
         message: 'Metadata saved successfully',
       };
+    }
+  }
+
+  async getListOfFiles(folderName: string) {
+    const command = {
+      Bucket: this.bucketName,
+      Prefix: folderName,
+    };
+    try {
+      const response = await this.s3Service.listObjectsV2Command(command);
+      console.log(response);
+      const files = response.Contents?.map((item) => {
+        const fileName = item.Key?.replace(folderName + '/', '');
+        return fileName;
+      });
+      return files;
+    } catch (error) {
+      console.error('Error listing files:', error);
+      throw error;
     }
   }
 }

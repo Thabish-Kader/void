@@ -21,4 +21,6 @@ export class FileMetadataDto {
   s3Url: string;
   @IsOptional()
   fileSize?: number;
+  @IsNotEmpty()
+  key: string;
 }
