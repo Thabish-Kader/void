@@ -60,3 +60,9 @@ export const handleFilesUpload = async (
     }));
   }
 };
+
+export const getArchivedFiles = async (email: string) => {
+  const res = await axiosInstance.get(`upload/get-archived-files/${email}`);
+
+  return res;
+};
